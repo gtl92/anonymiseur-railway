@@ -161,11 +161,22 @@ const Server = (() => {
     return await r.json();
   }
 
+  function _normalizeType(t) {
+    if (typeof t === 'string') {
+      const id = t.toUpperCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/[^A-Z0-9]/g, '_')
+        .replace(/_+/g, '_').replace(/^_|_$/g, '');
+      return { id: id || 'CUSTOM', label: t };
+    }
+    return t;
+  }
+
   async function loadCustomTypes() {
     try {
       const r = await fetch(`${BASE}/api/custom_types`);
       const data = await r.json();
-      return data.types || [];
+      return (data.types || []).map(_normalizeType);
     } catch { return []; }
   }
 
