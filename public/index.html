@@ -277,16 +277,9 @@
 
   <!-- Aide installation Tesseract (masquée par défaut) -->
   <div class="tesseract-help" id="tesseractHelp" style="display:none">
-    <strong>⚠ OCR non disponible — PDF scanné détecté</strong>
-    <p>Pour activer l'OCR des PDF scannés, installez Tesseract :</p>
-    <ol>
-      <li>Ouvrez le <strong>Terminal</strong> (⌘ + Espace → "Terminal")</li>
-      <li>Tapez : <code>brew install tesseract tesseract-lang</code></li>
-      <li>Attendez la fin (3–5 min)</li>
-      <li>Relancez <strong>lancer.command</strong></li>
-    </ol>
-    <p>Si Homebrew n'est pas installé :<br>
-    <code>/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</code></p>
+    <strong>⚠ PDF scanné détecté</strong>
+    <p>Ce PDF semble être un scan. L'extraction de texte n'est pas disponible pour les PDFs scannés.<br>
+    Veuillez utiliser un PDF avec du texte natif.</p>
     <button class="btn-sm btn-outline" onclick="document.getElementById('tesseractHelp').style.display='none'"><i data-lucide="x"></i><span>Fermer</span></button>
   </div>
 

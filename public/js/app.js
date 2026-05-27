@@ -653,7 +653,7 @@ async function loadFile(file) {
     } catch (e) {
       hideLoadingModal();
       if (e.message === '__CANCELLED__') return; // annulation volontaire — pas d'alerte
-      alert(`Erreur extraction : ${e.message}\n\nVérifiez que lancer.command est démarré.`);
+      alert(`Erreur extraction : ${e.message}`);
       document.getElementById('btnStep1Next').disabled = false;
       return;
     }
