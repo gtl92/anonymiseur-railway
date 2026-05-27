@@ -1,0 +1,1665 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anonymiseur judiciaire — Legal Tech</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script>
+  // Theme bootstrap — read before paint to avoid FOUC
+  (function(){
+    try {
+      var t = localStorage.getItem('anon-theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', t);
+    } catch(e){}
+  })();
+</script>
+</head>
+<body>
+
+<!-- ══ HEADER ══════════════════════════════════════════════════════════════ -->
+<header class="app-header">
+  <div class="header-left">
+    <a class="header-logo" href="#" onclick="goToStep(1); return false;">
+      <span class="logo-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3v18M5 9l-3 6a4 4 0 0 0 6 0L5 9zM19 9l-3 6a4 4 0 0 0 6 0L19 9z"></path>
+          <path d="M4 21h16M9 3h6"></path>
+        </svg>
+      </span>
+      <span class="header-wordmark">
+        <span class="header-title">Anonymiseur<span class="header-title-sep"> · </span>Judiciaire</span>
+        <span class="header-sub">Traitement 100% local · Aucune donnée transmise</span>
+      </span>
+    </a>
+  </div>
+  <div class="header-center">
+    <!-- Statut serveur — badge coloré -->
+    <div class="server-badge server-badge--checking" id="serverStatusBar" role="status">
+      <span class="server-dot" aria-hidden="true"></span>
+      <span class="server-label">Connexion…</span>
+    </div>
+    <div class="dossier-badge" id="dossierBadge" style="display:none" onclick="openSettingsAndFocusDossier()">
+      <i data-lucide="folder-pen"></i>
+      <span id="dossierBadgeLabel"></span>
+    </div>
+  </div>
+  <div class="header-right">
+    <button class="btn-icon btn-icon--ghost" id="btnThemeToggle" type="button"
+      onclick="(function(){var h=document.documentElement;var n=h.getAttribute('data-theme')==='dark'?'light':'dark';h.setAttribute('data-theme',n);try{localStorage.setItem('anon-theme',n)}catch(e){}})()"
+      title="Basculer le thème" aria-label="Basculer le thème">
+      <i data-lucide="sun" class="theme-ic-sun"></i>
+      <i data-lucide="moon" class="theme-ic-moon"></i>
+    </button>
+    <button class="btn-icon btn-icon--ghost" id="btnSettings" onclick="toggleSettings()" title="Paramètres" aria-label="Paramètres">
+      <i data-lucide="settings-2"></i>
+    </button>
+  </div>
+</header>
+
+<!-- ══ SETTINGS DRAWER ═════════════════════════════════════════════════════ -->
+<div class="settings-backdrop" id="settingsBackdrop" onclick="toggleSettings()" style="display:none"></div>
+<aside class="settings-panel" id="settingsPanel" style="display:none" aria-label="Paramètres">
+  <div class="settings-inner">
+    <header class="settings-header">
+      <div class="settings-title"><i data-lucide="settings-2"></i><span>Paramètres</span></div>
+      <button class="btn-icon btn-icon--ghost" onclick="toggleSettings()" aria-label="Fermer"><i data-lucide="x"></i></button>
+    </header>
+
+    <div class="settings-search">
+      <i data-lucide="search" class="settings-search-ic"></i>
+      <input type="text" id="settingsSearch" class="settings-search-input" placeholder="Rechercher dans les paramètres…"
+        oninput="(function(v){v=v.toLowerCase();document.querySelectorAll('#settingsPanel .settings-section').forEach(function(s){s.style.display=(!v||s.dataset.search.includes(v))?'':'none'})})(this.value)">
+    </div>
+
+    <div class="settings-group">
+      <div class="settings-group-label">Détection</div>
+
+      <div class="settings-section" data-search="blacklist mots exclus détection automatique">
+        <div class="settings-row">
+          <div class="settings-row-icon"><i data-lucide="ban"></i></div>
+          <div class="settings-row-body">
+            <div class="settings-row-title">Blacklist</div>
+            <div class="settings-row-desc">Mots exclus de la détection automatique</div>
+          </div>
+          <button class="btn-sm btn-outline" onclick="openBlacklistManager()">Gérer</button>
+        </div>
+      </div>
+
+      <div class="settings-section" data-search="types personnalisés catégories témoin magistrat">
+        <div class="settings-row">
+          <div class="settings-row-icon"><i data-lucide="tag"></i></div>
+          <div class="settings-row-body">
+            <div class="settings-row-title">Types personnalisés</div>
+            <div class="settings-row-desc">Créer des catégories (Témoin, Magistrat…)</div>
+          </div>
+          <button class="btn-sm btn-outline" onclick="openTypeManager()">Gérer</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-group">
+      <div class="settings-group-label">Outils</div>
+
+      <div class="settings-section" data-search="fusionner concordances combiner documents vue globale">
+        <div class="settings-row">
+          <div class="settings-row-icon"><i data-lucide="git-merge"></i></div>
+          <div class="settings-row-body">
+            <div class="settings-row-title">Fusionner des concordances</div>
+            <div class="settings-row-desc">Combiner plusieurs documents en une vue globale</div>
+          </div>
+          <button class="btn-sm btn-outline" onclick="window.open('fusionneur.html','_blank')">Ouvrir</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-group">
+      <div class="settings-group-label">Projet de travail</div>
+
+      <div class="settings-section" data-search="référence dossier préfixe RG affaire numéro">
+        <div class="settings-row">
+          <div class="settings-row-icon"><i data-lucide="folder-pen"></i></div>
+          <div class="settings-row-body">
+            <div class="settings-row-title">Référence dossier</div>
+            <div class="settings-row-desc">Préfixe des fichiers exportés (ex : RG25-7450)</div>
+          </div>
+          <input type="text" id="dossierPrefix"
+            class="field-input"
+            placeholder="ex: RG25-7450"
+            maxlength="30"
+            style="width:130px;font-family:var(--font-mono);font-size:12px"
+            oninput="saveDossierPrefix(this.value)"
+            autocomplete="off" spellcheck="false">
+        </div>
+      </div>
+
+      <div class="settings-section" data-search="exporter projet sauvegarde texte entités blacklist règles ocr">
+        <div class="settings-row">
+          <div class="settings-row-icon"><i data-lucide="package"></i></div>
+          <div class="settings-row-body">
+            <div class="settings-row-title">Exporter le projet</div>
+            <div class="settings-row-desc">Sauvegarde complète : texte · entités · table · règles</div>
+          </div>
+          <button class="btn-sm btn-primary" onclick="exportSession()"><i data-lucide="download"></i><span>Exporter</span></button>
+        </div>
+      </div>
+
+      <div class="settings-section" data-search="reprendre projet importer session sauvegarde">
+        <div class="settings-row">
+          <div class="settings-row-icon"><i data-lucide="folder-open"></i></div>
+          <div class="settings-row-body">
+            <div class="settings-row-title">Reprendre un projet</div>
+            <div class="settings-row-desc">Recharger une session sauvegardée</div>
+          </div>
+          <button class="btn-sm btn-outline" onclick="triggerImportSession()"><i data-lucide="upload"></i><span>Charger</span></button>
+        </div>
+        <input type="file" id="sessionFileInput" accept=".json" style="display:none" onchange="importSession(event)">
+      </div>
+
+      <div class="session-autosave-status" id="autoSaveStatus"></div>
+    </div>
+
+    <div class="settings-group">
+      <div class="settings-group-label">Apparence</div>
+      <div class="settings-section" data-search="thème apparence dark light mode sombre clair">
+        <div class="settings-row">
+          <div class="settings-row-icon"><i data-lucide="palette"></i></div>
+          <div class="settings-row-body">
+            <div class="settings-row-title">Thème</div>
+            <div class="settings-row-desc">Basculer entre sombre et clair</div>
+          </div>
+          <div class="theme-segmented" role="radiogroup" aria-label="Thème">
+            <button type="button" class="theme-seg" data-theme-set="dark"
+              onclick="document.documentElement.setAttribute('data-theme','dark');try{localStorage.setItem('anon-theme','dark')}catch(e){}this.parentNode.querySelectorAll('.theme-seg').forEach(b=>b.classList.toggle('is-active',b===this))">
+              <i data-lucide="moon"></i><span>Sombre</span>
+            </button>
+            <button type="button" class="theme-seg" data-theme-set="light"
+              onclick="document.documentElement.setAttribute('data-theme','light');try{localStorage.setItem('anon-theme','light')}catch(e){}this.parentNode.querySelectorAll('.theme-seg').forEach(b=>b.classList.toggle('is-active',b===this))">
+              <i data-lucide="sun"></i><span>Clair</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</aside>
+
+<!-- ══ BLACKLIST MANAGER ═══════════════════════════════════════════════════ -->
+<div class="manager-overlay" id="blacklistManager" style="display:none">
+  <div class="manager-panel">
+    <div class="manager-header">
+      <div class="manager-title"><i data-lucide="ban"></i><span>Gestionnaire blacklist</span></div>
+      <button class="modal-close" onclick="closeBlacklistManager()" aria-label="Fermer"><i data-lucide="x"></i></button>
+    </div>
+    <div class="manager-body">
+      <div class="manager-toolbar">
+        <span id="blManagerCount" class="bl-count">0 mot</span>
+        <button class="btn-sm btn-danger" onclick="clearBlacklist()">Tout vider</button>
+        <button class="btn-sm btn-outline" onclick="exportBlacklist()"><i data-lucide="download"></i><span>Exporter</span></button>
+      </div>
+      <div class="bl-add-row">
+        <input type="text" id="blManagerInput" class="field-input mono"
+          placeholder="Ajouter un mot (ou plusieurs séparés par virgule)…"
+          onkeydown="if(event.key==='Enter') addToBlacklistFromManager()">
+        <button class="btn-sm btn-primary" onclick="addToBlacklistFromManager()">+ Ajouter</button>
+      </div>
+      <div class="bl-list" id="blManagerList"></div>
+    </div>
+    <div class="manager-footer">
+      <button class="btn-primary" onclick="closeBlacklistManager()">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TYPE MANAGER ════════════════════════════════════════════════════════ -->
+<div class="manager-overlay" id="typeManager" style="display:none">
+  <div class="manager-panel">
+    <div class="manager-header">
+      <div class="manager-title"><i data-lucide="tag"></i><span>Types personnalisés</span></div>
+      <button class="modal-close" onclick="closeTypeManager()" aria-label="Fermer"><i data-lucide="x"></i></button>
+    </div>
+    <div class="manager-body">
+      <p class="manager-desc">Créez vos propres catégories — elles apparaîtront dans le menu TYPE de chaque entité.</p>
+      <div class="bl-add-row">
+        <input type="text" id="typeManagerInput" class="field-input"
+          placeholder="Nom du type ex: Témoin, Magistrat, Société…"
+          onkeydown="if(event.key==='Enter') addCustomType()">
+        <button class="btn-sm btn-primary" onclick="addCustomType()">+ Créer</button>
+      </div>
+      <div class="bl-list" id="typeManagerList"></div>
+    </div>
+    <div class="manager-footer">
+      <button class="btn-primary" onclick="closeTypeManager()">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ STEPPER ═════════════════════════════════════════════════════════════ -->
+<nav class="stepper" aria-label="Étapes de traitement">
+  <button class="step-btn active" id="stepBtn1" onclick="goToStep(1)" data-step="1">
+    <span class="step-num"><span class="step-num-idx">1</span><i data-lucide="check" class="step-num-check"></i></span>
+    <span class="step-body">
+      <span class="step-label">Import</span>
+      <span class="step-sub">Document source</span>
+    </span>
+  </button>
+  <button class="step-btn" id="stepBtn2" onclick="goToStep(2)" disabled data-step="2">
+    <span class="step-num"><span class="step-num-idx">2</span><i data-lucide="check" class="step-num-check"></i></span>
+    <span class="step-body">
+      <span class="step-label">Corrections OCR</span>
+      <span class="step-sub">Nettoyage du texte</span>
+    </span>
+  </button>
+  <button class="step-btn" id="stepBtn3" onclick="goToStep(3)" disabled data-step="3">
+    <span class="step-num"><span class="step-num-idx">3</span><i data-lucide="check" class="step-num-check"></i></span>
+    <span class="step-body">
+      <span class="step-label">Entités</span>
+      <span class="step-sub">Détection &amp; édition</span>
+    </span>
+  </button>
+  <button class="step-btn" id="stepBtn4" onclick="goToStep(4)" disabled data-step="4">
+    <span class="step-num"><span class="step-num-idx">4</span><i data-lucide="check" class="step-num-check"></i></span>
+    <span class="step-body">
+      <span class="step-label">Résultats</span>
+      <span class="step-sub">Export &amp; concordance</span>
+    </span>
+  </button>
+</nav>
+
+<!-- ══ MAIN CONTENT ════════════════════════════════════════════════════════ -->
+<main class="app-main">
+
+  <!-- Statut serveur déplacé dans le header -->
+
+  <!-- Aide installation Tesseract (masquée par défaut) -->
+  <div class="tesseract-help" id="tesseractHelp" style="display:none">
+    <strong>⚠ OCR non disponible — PDF scanné détecté</strong>
+    <p>Pour activer l'OCR des PDF scannés, installez Tesseract :</p>
+    <ol>
+      <li>Ouvrez le <strong>Terminal</strong> (⌘ + Espace → "Terminal")</li>
+      <li>Tapez : <code>brew install tesseract tesseract-lang</code></li>
+      <li>Attendez la fin (3–5 min)</li>
+      <li>Relancez <strong>lancer.command</strong></li>
+    </ol>
+    <p>Si Homebrew n'est pas installé :<br>
+    <code>/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</code></p>
+    <button class="btn-sm btn-outline" onclick="document.getElementById('tesseractHelp').style.display='none'"><i data-lucide="x"></i><span>Fermer</span></button>
+  </div>
+
+  <!-- ── STEP 1 : Import ─────────────────────────────────────────────────── -->
+  <section class="step-panel active" id="step1">
+
+    <!-- Avant chargement : drop zone centrée -->
+    <div id="step1Import">
+      <div class="panel-header">
+        <h2>Document source</h2>
+        <p>Déposez votre document — PDF, DOCX ou TXT. Les PDF scannés sont traités par OCR local (Tesseract).</p>
+      </div>
+      <div class="drop-zone" id="dropZone"
+           ondragover="handleDragOver(event)"
+           ondragleave="handleDragLeave(event)"
+           ondrop="handleDrop(event)"
+           onclick="document.getElementById('fileInput').click()">
+        <input type="file" id="fileInput" accept=".txt,.pdf,.docx" style="display:none" onchange="handleFileSelect(event)">
+        <div class="drop-icon"><i data-lucide="file-text"></i></div>
+        <div class="drop-title">Glissez votre fichier ici</div>
+        <div class="drop-formats">.pdf · .docx · .txt</div>
+        <div class="drop-formats" style="opacity:.6;font-size:10px">Reprise possible : glissez un .txt sauvegardé depuis l'étape 2</div>
+        <div class="drop-sub">ou cliquez pour parcourir</div>
+        <div class="drop-pill" id="dropPill" style="display:none"></div>
+      </div>
+    </div>
+
+    <!-- Après chargement : document en pleine largeur -->
+    <div id="step1Preview" style="display:none">
+      <div class="step1-doc-wrap">
+        <!-- Header -->
+        <div class="step1-doc-header">
+          <span class="split-col-label" id="step1DocLabel"><i data-lucide="file-text"></i><span>Document chargé</span></span>
+          <div id="importStats" class="stats-inline" style="display:none">
+            <span id="statChars">—</span> car. ·
+            <span id="statLines">—</span> lignes
+          </div>
+        </div>
+        <!-- Viewer pleine largeur : PDF ou texte selon le type -->
+        <div class="step1-doc-body">
+          <iframe id="step1PdfPreview" class="step1-pdf-full" style="display:none" title="PDF original"></iframe>
+          <!-- Rendu DOCX via Mammoth -->
+          <div class="step1-docx-viewer" id="step1DocxPreview" style="display:none"></div>
+          <!-- Texte brut TXT -->
+          <div class="text-viewer step1-text-viewer" id="step1TextPreview"
+               contenteditable="false" style="cursor:default; display:none"></div>
+        </div>
+      </div>
+    </div><!-- /#step1Preview -->
+
+    <!-- Barre fixe step 1 (toujours visible) -->
+    <div class="step1-actionbar">
+      <button class="btn-sm btn-outline" id="btnStep1Change" onclick="resetStep1()"
+        style="display:none"><i data-lucide="rotate-ccw"></i><span>Changer de fichier</span></button>
+      <button class="btn-primary btn-lg" id="btnStep1Next" onclick="goToStep(2)" disabled>
+        Continuer<span class="btn-arrow"><i data-lucide="arrow-right"></i></span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ── STEP 2 : OCR Rules ──────────────────────────────────────────────── -->
+  <!-- ══ STEP 2 + 3 : Layout partagé ══════════════════════════════════════ -->
+
+
+  <!-- ── Sections step 2 et step 3 (panels séparés pour stepper) ── -->
+  <section class="step-panel" id="step2">
+    <!-- Analyze box step 3 (masquée en step 2) -->
+    <div class="analyze-box" id="analyzeBox" style="display:none">
+      <div class="analyze-info">
+        <div class="analyze-icon">🔍</div>
+        <div>
+          <div class="analyze-title">Analyser le document</div>
+          <div class="analyze-sub">Détection automatique des données personnelles.</div>
+        </div>
+      </div>
+      <button class="btn-primary btn-lg" id="btnAnalyze" onclick="runAnalysis()">Lancer l'analyse</button>
+    </div>
+    <div class="analysis-progress" id="analysisProgress" style="display:none">
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-msg" id="progressMsg">Analyse en cours…</div>
+    </div>
+  </section>
+
+  <section class="step-panel" id="step3" style="display:none">
+    <!-- step 3 utilise le layout partagé ci-dessous -->
+  </section>
+
+  <!-- ── Layout partagé (affiché en step 2 ET step 3) ── -->
+  <div id="sharedLayout" style="display:none">
+
+    <!-- Barre de contrôle OCR (visible en step 2 uniquement) -->
+    <div class="ocr-controlbar" id="ocrControlbar" style="display:none">
+      <div class="ocr-ctrl-group">
+        <button class="btn-sm btn-outline" onclick="saveStep2Txt()" class="btn-sm btn-outline ocr-tools-only" title="Sauvegarder le texte en .txt"><i data-lucide="save"></i><span>Sauvegarder</span></button>
+        <button class="btn-sm btn-outline" onclick="triggerStep2EntitiesImport()" class="btn-sm btn-outline ocr-tools-only" title="Importer entités JSON/CSV"><i data-lucide="download"></i><span>Entités</span></button>
+        <input type="file" id="step2EntitiesInput" accept=".json,.csv" style="display:none" onchange="handleStep2EntitiesImport(event)">
+
+        <div class="ocr-ctrl-sep"></div>
+        <div class="split-dropdown" id="sdSauts">
+          <button class="btn-sm btn-outline split-main" onclick="detectSuspectBreaks()" title="Détecter les sauts suspects depuis le début"><i data-lucide="corner-down-left"></i><span>Sauts</span></button><button class="btn-sm btn-outline split-arrow" onclick="toggleSplitDropdown('sdSauts', event)" title="Options">▾</button>
+        </div>
+        <button class="btn-sm btn-outline" onclick="autoFixAllBreaks()" class="btn-sm btn-outline ocr-tools-only" title="Auto-corriger tous les sauts"><i data-lucide="zap"></i><span>Auto</span></button>
+        <button class="btn-sm btn-outline" onclick="reduceMultipleBlankLines()" title="Réduire les sauts multiples à 1 ligne vide"><i data-lucide="chevrons-up-down"></i><span>Lignes</span></button>
+        <div class="split-dropdown" id="sdEspaces">
+          <button class="btn-sm btn-outline split-main" onclick="detectSpacedLetters()" title="Détecter les espaces parasites depuis le début"><i data-lucide="sparkle"></i><span>Espaces</span></button><button class="btn-sm btn-outline split-arrow" onclick="toggleSplitDropdown('sdEspaces', event)" title="Options">▾</button>
+        </div>
+        <span class="lb-badge-inline" id="lbSuspectCount" class="lb-badge-inline ocr-tools-only" style="display:none">—</span>
+      </div>
+      <div class="search-box ocr-ctrl-search ocr-tools-only" id="viewerSearchBox">
+        <input type="text" id="viewerSearch" class="search-input" placeholder="Rechercher…"
+          oninput="performSearch(); if(RR.active) rrScan();"
+          onkeydown="if(event.key==='Enter') navigateSearch(event.shiftKey ? -1 : 1)">
+        <span class="search-count" id="searchCount"></span>
+        <button class="search-nav" onclick="navigateSearch(-1)" title="Précédent (Maj+Entrée)">↑</button>
+        <button class="search-nav" onclick="navigateSearch(1)" title="Suivant (Entrée)">↓</button>
+        <button class="search-clear" onclick="clearSearch(); if(RR.active) closeRRPanel();" title="Effacer">✕</button>
+        <button class="btn-sm search-uncovered-toggle" id="btnSearchUncovered"
+          onclick="toggleSearchUncovered()"
+          title="Afficher uniquement les occurrences non couvertes par une entité">
+          <i data-lucide="alert-triangle"></i><span>Non couverts</span>
+        </button>
+
+      </div>
+      <div class="ocr-ctrl-group">
+        <button class="btn-sm btn-outline" id="btnRulesToggle" class="btn-sm btn-outline ocr-tools-only" onclick="toggleRulesDrawer()">
+          <i data-lucide="wrench"></i><span>Règles</span> <span class="badge" id="ocrRuleCount">0</span>
+        </button>
+      </div>
+      <button class="btn-sm btn-soft" onclick="openCaviarManager()"
+        title="Gérer les caviardages actifs" id="btnCaviarManager" style="position:relative">
+        <i data-lucide="scissors"></i><span>Caviardages</span> <span id="caviarBadge" class="badge" style="display:none">0</span>
+      </button>
+      <div class="ocr-ctrl-sep"></div>
+      <!-- Boutons de navigation step 2 / step 3 -->
+		<!-- Après -->
+		<div class="ocr-ctrl-group" id="ctrlNavStep2" style="display:none">
+		  <button class="btn-sm btn-soft" onclick="openPartiesModalFromToolbar()" title="Identifier demandeurs et défendeurs"><i data-lucide="scale-3d"></i><span>Parties</span></button>
+		  <button class="btn-primary btn-sm" onclick="goToStep(3)"><span>Entités</span><i data-lucide="arrow-right"></i></button>
+		  <div class="ocr-ctrl-sep--push"></div>
+		  <button class="btn-sm btn-nav-back" onclick="goToStep(1)" title="Retour à l'import"><i data-lucide="arrow-left"></i><span>Retour</span></button>
+		</div>      
+		<div class="ocr-ctrl-group" id="ctrlNavStep3" style="display:none">
+        <button class="btn-sm btn-soft" onclick="openPartiesModalFromToolbar()" title="Identifier demandeurs et défendeurs"><i data-lucide="scale-3d"></i><span>Parties</span></button>
+        <button class="btn-primary btn-sm" onclick="runAnonymization()"><i data-lucide="lock"></i><span>Anonymiser</span></button>
+        <div class="ocr-ctrl-sep--push"></div>
+        <button class="btn-sm btn-nav-back" onclick="goToStep(2)" title="Retour à la correction"><i data-lucide="arrow-left"></i><span>Retour</span></button>
+      </div>
+    </div>
+<!-- Navigation sauts de ligne -->
+    <div class="lbnav-bar" id="lbNav" style="display:none">
+      <div class="lbnav-preview-row">
+        <div class="linebreak-preview" id="lbPreview">—</div>
+      </div>
+      <div class="lbnav-btns-row">
+        <button class="btn-sm btn-outline lbnav-btn-fixed" onclick="lbNavigate(-1)">↑ Préc.</button>
+        <span class="lb-counter" id="lbCounter">0 / 0</span>
+        <button class="btn-sm btn-outline lbnav-btn-fixed" onclick="lbNavigate(1)">↓ Suiv.</button>
+        <button class="btn-sm btn-primary lbnav-btn-fixed" onclick="lbMergeCurrent()">↩ Fusionner</button>
+        <button class="btn-sm btn-outline lbnav-btn-fixed lbnav-btn-danger" onclick="lbMergeFromHere()" title="Fusionner automatiquement tous les sauts restants à partir de la position courante">⚡ Tout →</button>
+        <button class="btn-sm btn-outline lbnav-btn-fixed" onclick="lbQuit()" title="Quitter le mode correction des sauts">✕ Quitter</button>
+      </div>
+    </div>
+
+    <!-- Navigation espaces parasites OCR -->
+    <div class="lbnav-bar" id="spNav" style="display:none">
+      <div class="lbnav-preview-row">
+        <div class="linebreak-preview" id="spPreview">
+          <span class="lb-ctx" id="spOriginal">—</span>
+          <span class="lb-mark">→</span>
+          <input class="sp-edit-input" id="spMergedInput" type="text" value=""
+            title="Modifiez la correction avant de fusionner"
+            onkeydown="if(event.key==='Enter') spMergeCurrent(); if(event.key==='Escape') spSkipCurrent();">
+        </div>
+      </div>
+
+      
+      <div class="lbnav-btns-row">
+        <button class="btn-sm btn-outline lbnav-btn-fixed" onclick="spNavigate(-1)">↑ Préc.</button>
+        <span class="lb-counter" id="spCounter">0 / 0</span>
+        <button class="btn-sm btn-outline lbnav-btn-fixed" onclick="spNavigate(1)">↓ Suiv.</button>
+        <button class="btn-sm btn-primary lbnav-btn-fixed" onclick="spMergeCurrent()">↩ Fusionner</button>
+        <button class="btn-sm btn-outline lbnav-btn-fixed lbnav-btn-danger" onclick="spMergeFromHere()" title="Fusionner automatiquement tous les espaces restants à partir d'ici">⚡ Tout →</button>
+        <button class="btn-sm btn-outline lbnav-btn-fixed" onclick="spSkipCurrent()">⇥ Ignorer</button>
+        <button class="btn-sm btn-outline lbnav-btn-fixed" onclick="spQuit()" title="Quitter le mode correction des espaces">✕ Quitter</button>
+      </div>
+    </div>
+
+    <div class="ocr-split-wrap">
+      <div class="ocr-split" id="ocrSplit">
+
+        <!-- Header symétrique -->
+        <div class="split-header-row">
+
+          <!-- Côté gauche header : change selon l'étape -->
+          <div class="split-header-left" id="splitHeaderLeft">
+            <!-- Step 2 : infos PDF + bouton ouvrir -->
+            <div id="headerPdfPanel">
+              <span class="split-col-label"><i data-lucide="file-text"></i><span>Document original</span></span>
+              <span class="source-snapshot-label" id="sourceSnapshotLabel" title="Aperçu au moment du chargement — non mis à jour">📷 t⁰</span>
+              <button class="btn-sm btn-outline" onclick="document.getElementById('sessionFileInputStep2').click()"
+                title="Reprendre une session sauvegardée — recharge le texte et les entités"
+                style="margin-left:8px;font-size:11px"><i data-lucide="folder-open"></i><span>Session</span></button>
+              <input type="file" id="sessionFileInputStep2" accept=".json" style="display:none" onchange="importSession(event)">
+              <div class="split-col-actions">
+                <span class="split-no-doc" id="splitNoDoc">Aucun document chargé</span>
+                <button class="btn-sm btn-outline" id="btnOpenSource" onclick="openSourceNewWindow()"
+                  title="Ouvrir la source dans une nouvelle fenêtre" style="display:none">
+                  <i data-lucide="external-link"></i><span>Source</span>
+                </button>
+              </div>
+            </div>
+            <!-- Step 3 : toggle PDF / Entités -->
+            <div id="headerEntitiesPanel" style="display:none">
+              <div class="left-panel-toggle">
+                <button class="lpt-btn active" id="lptBtnPdf" onclick="setLeftPanelView('pdf')" title="Voir le document original">
+                  <i data-lucide="file-text"></i>
+                </button>
+                <button class="lpt-btn" id="lptBtnEnt" onclick="setLeftPanelView('entities')" title="Voir les entités">
+                  <i data-lucide="search"></i>
+                  <span class="lpt-count" id="entityCount">0</span>
+                </button>
+                <button class="lpt-btn lpt-btn-verify" id="lptBtnVerify" onclick="toggleOublisPanel()" title="Vérifier les oublis d'anonymisation">
+                  <i data-lucide="shield-alert"></i>
+                  <span id="oublisBadge" class="badge-oublis" style="display:none">0</span>
+                </button>
+              </div>
+              <button class="btn-sm btn-outline" id="btnLoadRefPdf"
+                onclick="triggerLoadRefPdf()"
+                title="Charger un PDF original pour le visualiser en référence"
+                style="display:none; margin-left:6px; font-size:11px">
+                <i data-lucide="paperclip"></i>
+              </button>
+              <span class="entity-count-small">
+                <span id="entityActive">0</span> actives
+              </span>
+
+            </div>
+          </div>
+
+          <button class="panel-toggle-btn" id="btnCollapseLeft"
+            onclick="togglePanel('left')" title="Masquer / afficher le panneau gauche">◀</button>
+          <div class="split-header-divider"></div>
+          <button class="panel-toggle-btn" id="btnCollapseRight"
+            onclick="togglePanel('right')" title="Masquer / afficher le panneau droit">▶</button>
+
+          <div class="split-header-right">
+            <span class="split-col-label" id="rightPanelLabel"><i data-lucide="file-edit"></i><span>Texte corrigé</span></span>
+            <!-- Toggle prévisualisation anonymisée (step 3 uniquement) -->
+            <label class="anon-preview-toggle" id="anonPreviewToggle" style="display:none" title="Prévisualiser le texte anonymisé">
+              <input type="checkbox" id="anonPreviewSwitch" onchange="toggleAnonPreview(this.checked)">
+              <span class="anon-toggle-track">
+                <span class="anon-toggle-thumb"></span>
+              </span>
+              <span class="anon-toggle-label"><i data-lucide="lock-keyhole"></i><span>Anonymisé</span></span>
+            </label>
+            <button class="btn-sm btn-outline" id="btnOpenCorrected" onclick="openCorrectedNewWindow()" title="Ouvrir le texte corrigé dans une nouvelle fenêtre">
+              <i data-lucide="external-link"></i><span>Corrigé</span>
+            </button>
+            <button class="btn-sm btn-outline btn-no" onclick="openEntitiesModal()" title="Mode plein écran"><i data-lucide="maximize-2"></i><span>Agrandir</span></button>
+            <button class="btn-sm btn-outline btn-no btn-icon-refresh" onclick="refreshEntityViewer()" title="Actualiser"><img src="css/rechargerGreen.png" alt="Actualiser" class="icon-refresh"> Actualiser</button>
+
+            <!-- Hint step 2 -->
+            <div class="viewer-hint-inline" id="viewerHint" style="display:none">
+              <i data-lucide="info" class="hint-icon"></i><strong>Cliquez pour éditer</strong> · Sélectionnez :
+              <button onclick="prefillOcr()"><i data-lucide="wrench" class="btn-mini-ic"></i><span>Règle OCR</span></button>
+              <button onclick="addSelectedToEntities()"><i data-lucide="lock"></i><span>Anonymiser</span></button>
+            </div>
+            <!-- Hint step 3 -->
+            <div id="step3RightHeader" style="display:none">
+              <div class="step3-search-row">
+                <div class="search-box entity-viewer-search">
+                  <input type="text" id="entityViewerSearch" class="search-input" placeholder="Rechercher…"
+                    oninput="entityViewerSearch(); if(RR.active) rrScan();"
+                    onkeydown="if(event.key==='Enter') entityViewerNavigate(event.shiftKey ? -1 : 1)">
+                  <span class="search-count" id="entitySearchCount"></span>
+                  <button class="search-nav" onclick="entityViewerNavigate(-1)">↑</button>
+                  <button class="search-nav" onclick="entityViewerNavigate(1)">↓</button>
+                  <button class="search-clear" onclick="entityViewerClear(); if(RR.active) closeRRPanel();">✕</button>
+                </div>
+                <button class="btn-sm search-uncovered-toggle" id="btnEntitySearchUncovered"
+                  onclick="toggleEntitySearchUncovered()"
+                  title="Naviguer uniquement dans les occurrences non couvertes par une entité">
+                  <i data-lucide="alert-triangle"></i><span>Non couverts</span>
+                </button>
+
+                <button class="btn-sm btn-rr-toggle" id="btnRRToggle"
+                  onclick="toggleRRPanel()"
+                  title="Rechercher et remplacer (Ctrl+H)">
+                  <i data-lucide="replace"></i><span>Remplacer</span>
+                </button>
+                <span class="entity-viewer-hint" id="entityViewerHint">Cliquez sur une entité</span>
+              </div>
+              <div id="viewerHintStep3" style="display:none"><span id="viewerHintStep3Label"></span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Colonnes -->
+        <div class="ocr-split-cols" id="ocrSplitCols">
+
+          <!-- Colonne gauche : PDF (step2) ou Entités (step3) -->
+          <div class="ocr-split-left" id="ocrSplitLeft">
+
+            <!-- Panneau PDF (step 2) -->
+            <div id="leftPdfPanel" class="left-panel">
+              <iframe id="pdfPreview" class="split-pdf" style="display:none" title="PDF original"></iframe>
+              <div id="splitDocxPreview" class="split-docx-viewer" style="display:none"></div>
+              <div class="viewer-wrap" id="origViewerWrap" style="display:none; flex:1; min-height:0">
+                <div class="viewer-gutter" id="origViewerGutter" aria-hidden="true"></div>
+                <div class="text-viewer split-text-orig" id="textViewerOriginal"></div>
+              </div>
+              <div class="split-placeholder" id="splitPlaceholder">
+                <div class="split-placeholder-illus">
+                  <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" width="80" height="80">
+                    <rect x="12" y="8" width="46" height="60" rx="6" fill="#e8edf5" stroke="#c5d0e6" stroke-width="1.5"/>
+                    <rect x="20" y="22" width="30" height="3" rx="1.5" fill="#c5d0e6"/>
+                    <rect x="20" y="30" width="24" height="3" rx="1.5" fill="#c5d0e6"/>
+                    <rect x="20" y="38" width="28" height="3" rx="1.5" fill="#c5d0e6"/>
+                    <rect x="20" y="46" width="18" height="3" rx="1.5" fill="#c5d0e6"/>
+                    <circle cx="57" cy="57" r="14" fill="#1e3a8a"/>
+                    <path d="M51 57h12M57 51v12" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+                  </svg>
+                </div>
+                <div class="split-placeholder-title">Document original</div>
+                <div class="split-placeholder-sub">Importez un fichier PDF, DOCX ou TXT<br>pour voir le document ici</div>
+                <button class="split-placeholder-btn" onclick="goToStep(1)">← Importer un document</button>
+              </div>
+            </div>
+
+            <!-- Panneau Entités (step 3) -->
+            <div id="leftEntitiesPanel" class="left-panel" style="display:none">
+
+              <!-- Barre compacte une ligne -->
+              <div class="entity-toolbar-compact">
+                <div class="search-box entity-search-box">
+                  <input type="text" id="entitySearch" class="search-input"
+                    placeholder="Rechercher une entité…"
+                    oninput="filterEntitiesSearch()">
+                  <button class="search-clear" onclick="clearEntitySearch()" title="Effacer">✕</button>
+                </div>
+                <button class="ebar-btn btn-icon-only" id="btnSortEntities" onclick="toggleEntitySort()" title="Tri A→Z / Z→A">
+                  <i data-lucide="arrow-up-down"></i>
+                </button>
+                <select class="entity-type-filter" id="typeFilter" onchange="filterEntities()">
+                  <option value="">Tous</option>
+                  <option value="NOM">Noms</option>
+                  <option value="ENTITE">Entreprises</option>
+                  <option value="ADRESSE">Adresses</option>
+                  <option value="REF">Références</option>
+                  <option value="AUTRE">Autre</option>
+                </select>
+                <div class="ebar-actions-dropdown" id="ebarActionsDropdown">
+                  <button class="ebar-btn ebar-actions-btn" onclick="toggleEbarActions()" title="Actions sur les entités">
+                    <i data-lucide="zap"></i><span>Actions</span><i data-lucide="chevron-down" class="caret"></i>
+                  </button>
+                  <div class="ebar-actions-menu" id="ebarActionsMenu" style="display:none">
+                    <button onclick="triggerEntityImport(); closeEbarActions()" title="Importer des entités depuis JSON/CSV">
+                      <i data-lucide="download"></i><span>Importer entités</span>
+                    </button>
+                    <button onclick="triggerConcordanceImport(); closeEbarActions()" title="Importer une table d'anonymisation (concordance) et fusionner avec les entités">
+                      <i data-lucide="clipboard-list"></i><span>Importer table d'anonymisation</span>
+                    </button>
+                    <button onclick="mergeDuplicateEntities(); closeEbarActions()" title="Fusionner les entités cochées">
+                      <i data-lucide="wand-2"></i><span>Fusionner la sélection</span>
+                    </button>
+                    <button onclick="addEntityManual(); closeEbarActions()" title="Ajouter une entité manuellement">
+                      <i data-lucide="plus"></i><span>Ajouter manuellement</span>
+                    </button>
+                    <button onclick="toggleOublisPanel(); closeEbarActions()" title="Vérifier les oublis d'anonymisation">
+                      <i data-lucide="shield-alert"></i><span>Vérifier les oublis</span>
+                    </button>
+                    <button onclick="triggerBlacklistImport(); closeEbarActions()" title="Importer une liste d'exclusions">
+                      <i data-lucide="ban"></i><span>Importer exclusions</span>
+                    </button>
+                    <div class="ebar-menu-sep"></div>
+                    <button onclick="exportEntitiesJson(); closeEbarActions()" title="Exporter les entités en JSON">
+                      <i data-lucide="download"></i><span>Exporter</span> JSON
+                    </button>
+                    <button onclick="exportEntitiesCsv(); closeEbarActions()" title="Exporter les entités en CSV">
+                      <i data-lucide="download"></i><span>Exporter</span> CSV
+                    </button>
+                  </div>
+                </div>
+                <button class="btn-sm btn-outline btn-icon-only"
+                  onclick="exportBlacklist()"
+                  title="Exporter la blacklist">
+                  <i data-lucide="download"></i>
+                </button>
+                <button class="ebar-btn ebar-btn-undo btn-icon-only" id="btnUndo" onclick="undoEntities()"
+                  title="Rien à annuler" disabled style="opacity:0.4">
+                  <i data-lucide="undo-2"></i>
+                </button>
+              </div>
+              <!-- Bulk actions — affiché par app.js quand cases cochées/décochées -->
+              <div class="ebar-bulk" id="bulkActionsBar" style="display:none">
+                <button class="ebar-btn ebar-btn-outline" onclick="retireDecochees()"
+                  title="Retirer les entités DÉCOCHÉES (actives=non) de la liste, sans les blacklister"><i data-lucide="eye-off"></i><span>Retirer décochées</span></button>
+                <button class="ebar-btn ebar-btn-outline" onclick="retireCochees()"
+                  title="Retirer les entités COCHÉES (actives=oui) de la liste, sans les blacklister"><i data-lucide="eye-off"></i><span>Retirer cochées</span></button>
+                <button class="ebar-btn ebar-btn-danger" onclick="deleteUncheckedToBlacklist()"
+                  title="Supprimer les entités DÉCOCHÉES (inactives) et les blacklister"><i data-lucide="ban"></i><span>Décochées → BL</span></button>
+                <button class="ebar-btn ebar-btn-danger" onclick="deleteCheckedToBlacklist()"
+                  title="⚠ Supprime les entités COCHÉES (actives, à anonymiser) — utiliser avec précaution !"><i data-lucide="alert-triangle"></i><span>Cochées → BL</span></button>
+                <button class="ebar-btn ebar-btn-outline" onclick="deleteFilteredTypeToBlacklist()"
+                  title="Supprimer toutes les entités du type filtré"><i data-lucide="trash-2"></i><span>Type → BL</span></button>
+              </div>
+              <div class="entity-table-wrap">
+                <table class="entity-table" id="entityTable">
+                  <thead>
+                    <tr>
+                      <th class="col-check"><input type="checkbox" id="chkAllEntities" onchange="toggleAllEntities(this)"></th>
+                      <th class="col-value">Valeur détectée</th>
+                      <th class="col-type">Type</th>
+                      <th class="col-aliases">Alias</th>
+                      <th class="col-occ">Occ.</th>
+                      <th class="col-actions"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="entityTbody"></tbody>
+                </table>
+              </div>
+              <div class="entity-hint">
+                <i data-lucide="info" class="hint-icon"></i><strong>Cliquez sur une valeur</strong> pour la localiser · <strong>+alias</strong> · <strong>⛔</strong> pour exclure.
+              </div>
+            </div>
+
+            <!-- ── Panneau Vérification oublis (step 3) ── -->
+            <div id="leftOublisPanel" class="left-panel oublis-panel" style="display:none">
+              <div class="oublis-header">
+                <div class="oublis-header-top">
+                  <span class="oublis-title"><i data-lucide="shield-alert"></i><span>Vérification des oublis</span></span>
+                  <button class="oublis-close-btn" onclick="toggleOublisPanel()" title="Fermer">✕</button>
+                </div>
+                <div class="oublis-header-actions">
+                  <button class="oublis-scan-btn" onclick="runOublisPanel()"><i data-lucide="refresh-cw"></i><span>Scanner</span></button>
+                  <span class="oublis-count" id="oublisPanelCount">—</span>
+                </div>
+              </div>
+              <div class="oublis-nav" id="oublisNav" style="display:none">
+                <button class="oublis-nav-btn" onclick="oublisNavigate(-1)" title="Oubli précédent">↑</button>
+                <span class="oublis-nav-pos" id="oublisNavPos">1 / 1</span>
+                <button class="oublis-nav-btn" onclick="oublisNavigate(1)" title="Oubli suivant">↓</button>
+              </div>
+              <div class="oublis-list" id="oublisList">
+                <div class="oublis-empty">Cliquez sur <strong>Scanner</strong> pour analyser le document.</div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Séparateur draggable -->
+          <div class="ocr-split-divider" id="ocrSplitDivider" title="Glisser pour redimensionner"></div>
+
+          <!-- Colonne droite : textViewer (toujours fixe) -->
+          <div class="ocr-split-right" id="ocrSplitRight">
+            <div class="pdf-toolbar-spacer" id="pdfToolbarSpacer"></div>
+            <div class="viewer-wrap" id="viewerWrap">
+              <div class="viewer-gutter" id="viewerGutter" aria-hidden="true"></div>
+              <div class="text-viewer" id="textViewer"></div>
+            </div>
+            <div class="viewer-footer">
+              <span id="viewerStats" class="viewer-stats"></span>
+            </div>
+            <!-- Tiroir règles OCR -->
+            <div class="rules-drawer" id="rulesDrawer" style="display:none">
+              <div class="rules-drawer-header">
+                <span class="rules-title"><i data-lucide="wrench"></i><span>Règles</span> OCR <span class="badge" id="ocrRuleCountDrawer">0</span></span>
+                <button class="btn-icon-sm" onclick="toggleRulesDrawer()">✕</button>
+              </div>
+              <div class="rules-drawer-body">
+                <div class="add-rule-form">
+                  <div class="add-rule-row">
+                    <input type="text" id="ocrFrom" class="field-input mono" placeholder="Forme incorrecte…"
+                      onkeydown="if(event.key==='Enter') document.getElementById('ocrTo').focus()">
+                    <span class="add-rule-arrow">→</span>
+                    <input type="text" id="ocrTo" class="field-input mono" placeholder="Forme correcte…"
+                      onkeydown="if(event.key==='Enter') addOcrRule()">
+                    <button class="btn-sm btn-primary" onclick="addOcrRule()">+ Ajouter</button>
+                  </div>
+                  <label class="toggle-label" style="margin-top:6px">
+                    <input type="checkbox" id="ocrCaseSensitive" class="toggle-input">
+                    <span class="toggle-track"></span>
+                    <span class="toggle-text" style="font-size:11px">Sensible à la casse</span>
+                  </label>
+                </div>
+                <div class="rules-list-wrap">
+                  <div class="rules-header">
+                    <span class="rules-title">Règles actives</span>
+                    <button class="btn-link" onclick="clearAllOcrRules()" id="btnClearOcr" style="display:none">Tout effacer</button>
+                  </div>
+                  <div id="ocrRuleList" class="rule-list"><div class="rule-empty">Aucune règle active.</div></div>
+                </div>
+                <div id="ocrSubstCount" class="subst-count" style="display:none"></div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /.ocr-split-cols -->
+      </div><!-- /.ocr-split -->
+    </div><!-- /.ocr-split-wrap -->
+
+    <!-- Actions step 2/3 déplacées dans la controlbar en haut -->
+    <div id="step2Actions" style="display:none"></div>
+    <div id="step3Actions" style="display:none"></div>
+
+  </div><!-- /#sharedLayout -->
+
+  <!-- Bouton flottant mobile -->
+  <button class="btn-preview-orig" id="btnPreviewOrig" onclick="openOriginalOverlay()" title="Voir le document original">
+    <i data-lucide="eye"></i><span>Original</span>
+  </button>
+
+    <!-- ── STEP 4 : Results ────────────────────────────────────────────────── -->
+  <section class="step-panel" id="step4">
+    <div class="panel-header">
+      <h2>Document anonymisé</h2>
+      <p>Vérifiez le résultat, puis exportez le document et sa table d'anonymisation.</p>
+    </div>
+
+    <!-- Bannière rappel export (disparaît après "Tout exporter") -->
+    <div class="export-rappel-banner" id="exportRappelBanner" style="display:none">
+      <span><i data-lucide="alert-triangle"></i><span>N'oubliez pas d'exporter la table d'anonymisation avant de quitter</span></span>
+      <button class="btn-primary export-rappel-btn" onclick="exportTout()"><i data-lucide="download"></i><span>Tout exporter</span></button>
+    </div>
+
+    <!-- Result tabs -->
+    <div class="result-tabs">
+      <button class="rtab active" onclick="switchResultTab('doc', this)"><i data-lucide="file-text"></i><span>Document anonymisé</span></button>
+      <button class="rtab" onclick="switchResultTab('conc', this)">
+        <i data-lucide="clipboard-list"></i><span>Table d'anonymisation</span> <span class="badge" id="concBadge">0</span>
+      </button>
+    </div>
+
+    <!-- Onglet Document -->
+    <div class="result-panel active" id="rp-doc">
+      <div class="result-doc" id="resultDoc"></div>
+      <div class="result-actions">
+        <button class="btn-primary" onclick="exportTout()" title="Télécharge un ZIP contenant le document .txt et la table d'anonymisation CSV">
+          <i data-lucide="download"></i><span>Tout exporter</span> <span class="export-tout-hint">(.zip)</span>
+        </button>
+        <button class="btn-outline" onclick="exportTxt()" title="Télécharger uniquement le document anonymisé"><i data-lucide="download"></i><span>.txt seul</span></button>
+        <button class="btn-outline" onclick="copyResult()"><i data-lucide="copy"></i><span>Copier</span></button>
+        <button class="btn-outline" onclick="goToStep(3)"><i data-lucide="arrow-left"></i><span>Modifier les entités</span></button>
+      </div>
+    </div>
+
+    <!-- Onglet Table d'anonymisation (ex-Concordance) -->
+    <div class="result-panel" id="rp-conc">
+      <div class="conc-info">
+        <i data-lucide="info" class="hint-icon"></i>La <strong>table d'anonymisation</strong> associe chaque placeholder (<code>[NOM_1]</code>…) à la valeur originale remplacée.
+        Elle est nécessaire pour désanonymiser le document ultérieurement.
+      </div>
+      <div class="conc-table-wrap">
+        <table class="conc-table">
+          <thead>
+            <tr><th>Placeholder</th><th>Valeur originale</th><th>Alias inclus</th><th>Type</th></tr>
+          </thead>
+          <tbody id="concTbody"></tbody>
+        </table>
+      </div>
+      <div class="result-actions">
+        <button class="btn-primary" onclick="exportTout()" title="Télécharge un ZIP contenant le document .txt et la table d'anonymisation CSV">
+          <i data-lucide="download"></i><span>Tout exporter</span> <span class="export-tout-hint">(.zip)</span>
+        </button>
+        <button class="btn-outline" onclick="exportCsv()" title="Exporter uniquement la table CSV"><i data-lucide="download"></i><span>Table CSV seule</span></button>
+        <button class="btn-outline" onclick="exportJson()" title="Exporter uniquement la table JSON"><i data-lucide="download"></i><span>Table JSON seule</span></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ MENU CONTEXTUEL ÉDITEUR ═══════════════════════════════════════════ -->
+  <div class="ctx-menu" id="ctxMenu" style="display:none">
+    <div class="ctx-menu-label" id="ctxMenuLabel">—</div>
+    <div class="ctx-menu-sep"></div>
+    <button class="ctx-menu-item" onclick="ctxBlockEntity()"><i data-lucide="ban" class="ctx-ic"></i><span>Ne pas anonymiser</span></button>
+    <button class="ctx-menu-item" onclick="ctxRemoveEntity()"><i data-lucide="trash-2" class="ctx-ic"></i><span>Supprimer l'entité</span></button>
+    <button class="ctx-menu-item ctx-menu-sep-item" onclick="ctxCaviarder()"><i data-lucide="scissors" class="ctx-ic"></i><span>Caviarder ce mot</span></button>
+    <button class="ctx-menu-item" onclick="ctxToOcrRule()"><i data-lucide="wrench" class="btn-mini-ic"></i><span>Règle OCR</span></button>
+    <button class="ctx-menu-item" id="ctxInitialeBtn" onclick="ctxSetInitiale()" style="display:none">
+      <i data-lucide="sparkle" class="ctx-ic"></i><span>Initiale de prénom</span>
+    </button>
+    <!-- Trigger sous-menu — le sous-menu lui-même est EN DEHORS de ce div -->
+    <div class="ctx-menu-item ctx-submenu-trigger" id="ctxAnonymiserTrigger"
+         onmouseenter="openCtxSubmenu()" onclick="openCtxSubmenu()">
+      <i data-lucide="lock"></i><span>Anonymiser</span> ce mot ▸
+    </div>
+  </div>
+
+  <!-- Sous-menu indépendant — position:fixed, hors de ctxMenu pour éviter overflow -->
+  <div class="ctx-submenu" id="ctxSubmenu" style="display:none">
+    <div class="ctx-submenu-group">NOM</div>
+    <button class="ctx-menu-item" onclick="ctxAssignRole('NOM', null)"><i data-lucide="user" class="ctx-ic"></i><span>NOM (défaut)</span></button>
+
+    <div class="ctx-submenu-group">DEMANDEUR</div>
+    <button class="ctx-menu-item" onclick="ctxAssignRole('DEMANDEUR', null)"><i data-lucide="user-check" class="ic-dem"></i><span>Demandeur</span></button>
+    <button class="ctx-menu-item" onclick="ctxAssignRole('DEMANDEUR', 'Mme')"><i data-lucide="user-check" class="ic-dem"></i><span>Mme Demandeur</span></button>
+    <button class="ctx-menu-item" onclick="ctxAssignRole('DEMANDEUR', 'Madame')"><i data-lucide="user-check" class="ic-dem"></i><span>Madame Demandeur</span></button>
+    <button class="ctx-menu-item" onclick="ctxAssignRole('DEMANDEUR', 'M.')"><i data-lucide="user-check" class="ic-dem"></i><span>M. Demandeur</span></button>
+    <button class="ctx-menu-item" onclick="ctxAssignRole('DEMANDEUR', 'Monsieur')"><i data-lucide="user-check" class="ic-dem"></i><span>Monsieur Demandeur</span></button>
+    <button class="ctx-menu-item" onclick="ctxAssignRole('DEMANDEUR', 'Me')"><i data-lucide="user-check" class="ic-dem"></i><span>Me Demandeur</span></button>
+
+    <div class="ctx-submenu-group">DÉFENDEUR</div>
+    <button class="ctx-menu-item" onclick="ctxAssignRole('DEFENDEUR', null)"><i data-lucide="shield" class="ic-def"></i><span>Défendeur</span></button>
+    <button class="ctx-menu-item" onclick="ctxAssignRole('DEFENDEUR', 'Mme')"><i data-lucide="shield" class="ic-def"></i><span>Mme Défendeur</span></button>
+    <button class="ctx-menu-item" onclick="ctxAssignRole('DEFENDEUR', 'Madame')"><i data-lucide="shield" class="ic-def"></i><span>Madame Défendeur</span></button>
+    <button class="ctx-menu-item" onclick="ctxAssignRole('DEFENDEUR', 'M.')"><i data-lucide="shield" class="ic-def"></i><span>M. Défendeur</span></button>
+    <button class="ctx-menu-item" onclick="ctxAssignRole('DEFENDEUR', 'Monsieur')"><i data-lucide="shield" class="ic-def"></i><span>Monsieur Défendeur</span></button>
+    <button class="ctx-menu-item" onclick="ctxAssignRole('DEFENDEUR', 'Me')"><i data-lucide="shield" class="ic-def"></i><span>Me Défendeur</span></button>
+
+    <div class="ctx-submenu-group">GROUPE</div>
+    <button class="ctx-menu-item" onclick="ctxAssignRole('COUPLE_DEMANDEUR', null)"><i data-lucide="users" class="ic-dem"></i><span>Époux Demandeur</span></button>
+    <button class="ctx-menu-item" onclick="ctxAssignRole('COUPLE_DEFENDEUR', null)"><i data-lucide="users" class="ic-def"></i><span>Époux Défendeur</span></button>
+    <button class="ctx-menu-item" onclick="ctxAssignRole('FAMILLE_DEMANDEUR', null)"><i data-lucide="users-round" class="ic-dem"></i><span>Famille Demandeur</span></button>
+    <button class="ctx-menu-item" onclick="ctxAssignRole('FAMILLE_DEFENDEUR', null)"><i data-lucide="users-round" class="ic-def"></i><span>Famille Défendeur</span></button>
+  </div>
+
+  <!-- ══ MODALE ENTITÉS PLEINE LARGEUR ════════════════════════════════════ -->
+  <div class="modal-overlay entities-modal-overlay" id="entitiesModal" style="display:none">
+    <div class="entities-modal">
+
+      <!-- Header modale -->
+      <div class="entities-modal-header">
+        <div class="entities-modal-title">
+          <i data-lucide="search"></i><span>Entités</span> à anonymiser
+          <span class="entity-count-small" style="font-weight:400;margin-left:8px">
+            <span id="entityCountModal">0</span> entités ·
+            <span id="entityActiveModal">0</span> actives
+          </span>
+        </div>
+        <div class="entities-modal-toolbar">
+          <div class="entity-search-box">
+            <input type="text" id="entitySearchModal" class="search-input"
+              placeholder="Rechercher…" oninput="filterEntitiesSearchModal()">
+            <button class="search-clear" onclick="clearEntitySearchModal()">✕</button>
+          </div>
+          <select class="filter-select" id="typeFilterModal" onchange="filterEntitiesModal()">
+            <option value="">Tous les types</option>
+            <option value="NOM">Noms & Prénoms</option>
+            <option value="ENTITE">Entreprises</option>
+            <option value="ADRESSE">Adresses</option>
+            <option value="REF">Références</option>
+            <option value="AUTRE">Autre</option>
+          </select>
+          <button class="btn-sm btn-outline" onclick="toggleEntitySortModal()">⇅ A→Z</button>
+          <button class="btn-sm btn-outline" onclick="mergeDuplicateEntities()"><i data-lucide="wand-2"></i><span>Fusionner</span></button>
+          <button class="btn-sm btn-outline" onclick="addEntityManual()">+ Ajouter</button>
+          <div class="entities-modal-header-sep"></div>
+          <button class="btn-sm btn-primary" onclick="closeEntitiesModal(); runAnonymization()"><i data-lucide="lock"></i><span>Anonymiser</span></button>
+          <button class="btn-sm btn-secondary btn-no" onclick="closeEntitiesModal()" title="Réduire"><i data-lucide="minimize-2"></i><span>Fermer</span></button>
+        </div>
+      </div>
+
+      <!-- Corps : tableau + viewer côte-à-côte -->
+      <div class="entities-modal-body">
+
+        <!-- Tableau entités -->
+        <div class="entities-modal-left">
+          <div class="bulk-actions" id="bulkActionsModal" style="display:none">
+            <span class="bulk-label">Sélection :</span>
+            <button class="btn-sm btn-outline" onclick="retireDecochees()"
+              title="Retirer les entités DÉCOCHÉES de la liste, sans les blacklister"><i data-lucide="eye-off"></i><span>Retirer décochées</span></button>
+            <button class="btn-sm btn-outline" onclick="retireCochees()"
+              title="Retirer les entités COCHÉES de la liste, sans les blacklister"><i data-lucide="eye-off"></i><span>Retirer cochées</span></button>
+            <button class="btn-sm btn-danger" onclick="deleteUncheckedToBlacklist()"
+              title="Supprimer les entités DÉCOCHÉES (inactives)"><i data-lucide="ban"></i><span>Décochées → BL</span></button>
+            <button class="btn-sm btn-danger" onclick="deleteCheckedToBlacklist()"
+              title="⚠ Supprime les entités COCHÉES (actives) — précaution !"><i data-lucide="alert-triangle"></i><span>Cochées → BL</span></button>
+            <button class="btn-sm btn-danger btn-outline" onclick="deleteFilteredTypeToBlacklist()"><i data-lucide="trash-2"></i><span>Ce type → BL</span></button>
+            <button class="btn-sm btn-outline" onclick="undoEntities()" id="btnUndoModal"
+              title="Rien à annuler" disabled style="opacity:0.4"><i data-lucide="undo-2"></i><span>Annuler</span></button>
+          </div>
+          <div class="entity-table-wrap">
+            <table class="entity-table" id="entityTableModal">
+              <thead>
+                <tr>
+                  <th class="col-check"><input type="checkbox" id="chkAllEntitiesModal" onchange="toggleAllEntities(this)"></th>
+                  <th class="col-value">Valeur détectée</th>
+                  <th class="col-type">Type</th>
+                  <th class="col-aliases">Alias</th>
+                  <th class="col-occ">Occ.</th>
+                  <th class="col-actions"></th>
+                </tr>
+              </thead>
+              <tbody id="entityTbodyModal"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Séparateur -->
+        <div class="entities-modal-divider" id="entitiesModalDivider"></div>
+
+        <!-- Viewer texte -->
+        <div class="entities-modal-right">
+          <div class="entity-viewer-header">
+            <span class="split-col-label">📄 Texte corrigé</span>
+            <div class="search-box entity-viewer-search">
+              <input type="text" id="entityViewerSearchModal" class="search-input" placeholder="Rechercher…"
+                oninput="entityViewerSearch()"
+                onkeydown="if(event.key==='Enter') entityViewerNavigate(event.shiftKey ? -1 : 1)">
+              <span class="search-count" id="entitySearchCountModal"></span>
+              <button class="search-nav" onclick="entityViewerNavigate(-1)">↑</button>
+              <button class="search-nav" onclick="entityViewerNavigate(1)">↓</button>
+              <button class="search-clear" onclick="entityViewerClear()">✕</button>
+            </div>
+            <!-- Hint sélection texte (miroir du hint step3, visible en mode agrandi) -->
+            <div id="viewerHintStep3Modal" style="display:none"><span id="viewerHintStep3LabelModal"></span></div>
+            <span class="entity-viewer-hint" id="entityViewerHintModal" style="display:none">← Cliquez sur une entité</span>
+            <button class="btn-sm btn-outline btn-icon-refresh" onclick="refreshEntityViewer()" title="Actualiser"><img src="css/rechargerGreen.png" alt="Actualiser" class="icon-refresh"> Actualiser</button>
+          </div>
+          <div class="entities-modal-viewer" id="entitiesModalViewer"></div>
+        </div>
+
+      </div>
+
+
+    </div>
+  </div>
+
+  <!-- ══ MODALE SCANNER OUBLIS ════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="scanOublisOverlay" style="display:none" onclick="closeScanOublis()">
+    <div class="scan-modal" onclick="event.stopPropagation()">
+      <div class="scan-modal-header">
+        <div class="scan-modal-title"><i data-lucide="shield-alert"></i><span>Scanner les oublis</span></div>
+        <div class="scan-modal-subtitle" id="scanSubtitle">Détection d'entités potentiellement non anonymisées</div>
+        <button class="scan-modal-close" onclick="closeScanOublis()">✕</button>
+      </div>
+      <!-- Filtres catégories -->
+      <div class="scan-filters">
+        <button class="scan-filter-btn active" data-cat="all" onclick="scanFilterCat(this,'all')">Tout</button>
+        <button class="scan-filter-btn" data-cat="civilite" onclick="scanFilterCat(this,'civilite')"><i data-lucide="user"></i><span>Civilités</span></button>
+        <button class="scan-filter-btn" data-cat="adresse" onclick="scanFilterCat(this,'adresse')"><i data-lucide="home"></i><span>Adresses</span></button>
+        <button class="scan-filter-btn" data-cat="codepostal" onclick="scanFilterCat(this,'codepostal')"><i data-lucide="map-pin"></i><span>CP + Villes</span></button>
+        <button class="scan-filter-btn" data-cat="org" onclick="scanFilterCat(this,'org')"><i data-lucide="building-2"></i><span>Orgs.</span></button>
+      </div>
+      <!-- Zone résultats -->
+      <div class="scan-results" id="scanResults">
+        <div class="scan-empty">Lancez le scan pour détecter les oublis.</div>
+      </div>
+      <!-- Footer -->
+      <div class="scan-modal-footer">
+        <span class="scan-count" id="scanCount"></span>
+        <button class="btn-secondary" onclick="closeScanOublis()">Fermer</button>
+        <button class="btn-primary" onclick="runScanOublis()"><i data-lucide="refresh-cw"></i><span>Scanner</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ MODALE CONFIRM CUSTOM ════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="confirmModal" style="display:none" onclick="confirmModalCancel()">
+    <div class="confirm-modal" onclick="event.stopPropagation()">
+      <div class="confirm-modal-icon" id="confirmModalIcon">⚠️</div>
+      <div class="confirm-modal-title" id="confirmModalTitle">Confirmer</div>
+      <div class="confirm-modal-body" id="confirmModalBody"></div>
+      <div class="confirm-modal-footer">
+        <button class="btn-secondary" id="confirmModalCancelBtn" onclick="confirmModalCancel()">Annuler</button>
+        <button class="btn-primary" id="confirmModalOkBtn" onclick="confirmModalOk()">Confirmer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ POPUP CAVIARDAGE ══════════════════════════════════════════════════ -->
+  <!-- ══ GESTIONNAIRE CAVIARDAGES ════════════════════════════════════════ -->
+  <div class="modal-overlay" id="caviarManagerOverlay" style="display:none" onclick="closeCaviarManager()">
+    <div class="modal" onclick="event.stopPropagation()" style="max-width:460px">
+      <div class="modal-header">
+        <h3 class="modal-title"><i data-lucide="scissors"></i><span>Caviardages</span> actifs</h3>
+        <button class="btn-icon" onclick="closeCaviarManager()">✕</button>
+      </div>
+      <div class="modal-body" style="padding:16px 20px;min-height:80px">
+        <p id="caviarListEmpty" style="font-size:13px;color:var(--ink3);text-align:center;padding:20px 0">
+          Aucun caviardage actif.
+        </p>
+        <div id="caviarListItems"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeCaviarManager()">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="caviarOverlay" style="display:none" onclick="closeCaviar()">
+    <div class="modal" onclick="event.stopPropagation()" style="max-width:400px">
+      <div class="modal-header">
+        <h3 class="modal-title"><i data-lucide="scissors"></i><span>Caviarder</span></h3>
+        <button class="btn-icon" onclick="closeCaviar()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--ink2);margin-bottom:14px">
+          Remplacer <strong id="caviarTarget">—</strong> par :
+        </p>
+        <div class="caviar-options">
+          <label class="caviar-opt">
+            <input type="radio" name="caviarStyle" value="supprime" checked>
+            <span class="caviar-preview">[SUPPRIMÉ]</span>
+            <span class="caviar-label">Tag supprimé (défaut)</span>
+          </label>
+          <label class="caviar-opt">
+            <input type="radio" name="caviarStyle" value="blocks">
+            <span class="caviar-preview">████████</span>
+            <span class="caviar-label">Caviardage (blocs Unicode)</span>
+          </label>
+          <label class="caviar-opt">
+            <input type="radio" name="caviarStyle" value="vide">
+            <span class="caviar-preview caviar-preview--empty">(suppression)</span>
+            <span class="caviar-label">Supprimer le mot</span>
+          </label>
+          <label class="caviar-opt">
+            <input type="radio" name="caviarStyle" value="custom">
+            <span class="caviar-label">Personnalisé :</span>
+            <input type="text" id="caviarCustom" class="field-input"
+              placeholder="Texte de remplacement…"
+              style="width:140px;font-size:12px"
+              onfocus="document.querySelector('[name=caviarStyle][value=custom]').checked=true">
+          </label>
+        </div>
+        <div class="caviar-warning" style="background:#f0fdf4;border-color:#86efac;color:#166534">
+          ✓ Le texte source reste intact — gérez vos caviardages via le bouton <i data-lucide="scissors"></i><span>Caviardages</span>.
+        </div>
+      </div>
+      <div class="modal-body" style="padding-top:0;border-top:1px solid var(--border)">
+        <p style="font-size:12px;color:var(--ink2);margin:10px 0 6px">Portée :</p>
+        <div style="display:flex;gap:12px;font-size:13px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="radio" name="caviarScope" value="all" checked> Toutes les occurrences
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="radio" name="caviarScope" value="current"> Occurrence courante seulement
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeCaviar()">Annuler</button>
+        <button class="btn-primary" onclick="applyCaviar()"><i data-lucide="scissors"></i><span>Caviarder</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ POPUP CONFIRMATION FUSION ════════════════════════════════════════ -->
+  <div class="modal-overlay" id="mergeConfirmOverlay" style="display:none" onclick="closeMergeConfirm()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title"><i data-lucide="wand-2"></i><span>Confirmer la fusion</span></h3>
+        <button class="btn-icon" onclick="closeMergeConfirm()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--ink2);margin-bottom:12px">
+          Les entités suivantes seront fusionnées. La <strong>première</strong> deviendra canonique,
+          les autres seront ses alias. Décochez celles à exclure.
+        </p>
+        <div id="mergeConfirmList" class="merge-confirm-list"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeMergeConfirm()">Annuler</button>
+        <button class="btn-primary" onclick="confirmMerge()"><i data-lucide="wand-2"></i><span>Fusionner</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ OVERLAY ORIGINAL (mobile) ════════════════════════════════════════ -->
+  <div class="orig-overlay" id="origOverlay" style="display:none">
+    <div class="orig-overlay-header">
+      <span class="orig-overlay-title">Document original</span>
+      <button class="orig-overlay-close" onclick="closeOriginalOverlay()"><i data-lucide="x"></i><span>Fermer</span></button>
+    </div>
+    <div class="orig-overlay-body">
+      <iframe id="pdfOverlay" class="pdf-preview" style="display:none" title="PDF original"></iframe>
+      <div class="text-viewer" id="textViewerOverlay" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- ══ MODALE PARTIES ══════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="partiesModal" style="display:none"
+       onclick="if(event.target===this) closePartiesModal()">
+    <div class="modal parties-modal" onclick="event.stopPropagation()">
+
+      <div class="modal-header">
+        <h3 class="modal-title"><i data-lucide="scale-3d"></i><span>Identification des parties</span></h3>
+        <button class="modal-close" onclick="closePartiesModal()">✕</button>
+      </div>
+
+      <div class="modal-body parties-modal-body">
+
+        <!-- ── Section détection automatique ── -->
+        <div class="parties-section">
+          <div class="parties-section-title"><i data-lucide="search"></i><span>Détection automatique dans le texte</span></div>
+          <div class="parties-kw-row">
+            <div class="parties-kw-col">
+              <label class="parties-kw-label"><i data-lucide="user-check" class="ic-dem"></i><span>Mots-clés demandeurs</span></label>
+              <input type="text" id="partiesKwDemandeur" class="field-input parties-kw-input"
+                placeholder="demandeur, requérant, appelant…">
+            </div>
+            <div class="parties-kw-col">
+              <label class="parties-kw-label"><i data-lucide="shield" class="ic-def"></i><span>Mots-clés défendeurs</span></label>
+              <input type="text" id="partiesKwDefendeur" class="field-input parties-kw-input"
+                placeholder="défendeur, intimé, mis en cause…">
+            </div>
+          </div>
+          <button class="btn-sm btn-primary parties-detect-btn"
+            onclick="runAutoDetectParties()"><i data-lucide="search-check"></i><span>Détecter dans le texte</span></button>
+          <div id="partiesAutoResult" class="parties-auto-results"></div>
+        </div>
+
+        <!-- ── Section regroupements détectés (IdentityResolver) ── -->
+        <div class="parties-section">
+          <div class="parties-section-title"><i data-lucide="users"></i><span>Regroupements détectés</span></div>
+          <div class="parties-hint">Cliquez sur un nom pour l'assigner comme partie.</div>
+          <div id="partiesSuggestions" class="parties-suggestions-list"></div>
+        </div>
+
+        <!-- ── Colonnes Demandeurs / Défendeurs ── -->
+        <div class="parties-columns">
+
+          <div class="parties-col">
+            <div class="parties-col-title parties-col-title--dem"><i data-lucide="user-check" class="ic-dem"></i><span>Demandeurs</span></div>
+            <div id="partiesDemandeursList" class="parties-items-list"></div>
+            <div class="parties-add-row">
+              <input type="text" id="partiesDemandeurInput" class="field-input"
+                placeholder="Nom libre…"
+                onkeydown="if(event.key==='Enter') addPartieManuelle('demandeurs')">
+              <button class="btn-sm btn-primary" onclick="addPartieManuelle('demandeurs')">+ Ajouter</button>
+            </div>
+          </div>
+
+          <div class="parties-col">
+            <div class="parties-col-title parties-col-title--def"><i data-lucide="shield" class="ic-def"></i><span>Défendeurs</span></div>
+            <div id="partiesDefendeursList" class="parties-items-list"></div>
+            <div class="parties-add-row">
+              <input type="text" id="partiesDefendeurInput" class="field-input"
+                placeholder="Nom libre…"
+                onkeydown="if(event.key==='Enter') addPartieManuelle('defendeurs')">
+              <button class="btn-sm btn-primary" onclick="addPartieManuelle('defendeurs')">+ Ajouter</button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Mini-dialog assignation (depuis suggestions) -->
+        <div id="partiesAddDialog" class="parties-assign-dialog" style="display:none">
+          <div class="parties-assign-inner">
+            <span class="parties-assign-label">Assigner <strong id="partiesAddLabel"></strong> comme :</span>
+            <div class="parties-assign-btns">
+              <button class="btn-sm btn-primary" onclick="confirmAddPartie('demandeurs')"><i data-lucide="user-check" class="ic-dem"></i><span>Demandeur</span></button>
+              <button class="btn-sm btn-outline" onclick="confirmAddPartie('defendeurs')"><i data-lucide="shield" class="ic-def"></i><span>Défendeur</span></button>
+              <button class="btn-sm btn-secondary" onclick="closeAddPartieDialog()">Annuler</button>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /.modal-body -->
+
+      <div class="modal-footer">
+        <span class="parties-footer-hint">
+          Les entités assignées reçoivent les types <code>DEMANDEUR_1</code>, <code>DEFENDEUR_1</code>…
+        </span>
+        <button class="btn-secondary" onclick="closePartiesModal()">Plus tard</button>
+        <button class="btn-primary" onclick="applyParties()"><i data-lucide="check"></i><span>Appliquer</span></button>
+      </div>
+
+    </div>
+  </div>
+  <!-- ══ MODALE INITIALE PRÉNOM ══════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="initialeModal" style="display:none"
+       onclick="if(event.target===this) closeInitialeModal()">
+    <div class="modal" style="max-width:400px" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title"><i data-lucide="sparkle" class="ctx-ic"></i><span>Initiale de prénom</span></h3>
+        <button class="modal-close" onclick="closeInitialeModal()">✕</button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Résumé -->
+        <p style="font-size:13px;color:var(--ink2);margin-bottom:16px">
+          Prénom <strong id="initialePrenom"></strong> → initiale
+          <strong id="initialeProposee" style="color:var(--mint)"></strong>
+        </p>
+
+        <!-- Conflit -->
+        <div id="initialeConflitZone" style="display:none;margin-bottom:14px">
+          <p style="font-size:12px;color:#e09000;margin-bottom:8px">
+            ⚠ Conflit — choisissez une alternative :
+          </p>
+          <div id="initialeConflitChips" class="initiale-chips"></div>
+        </div>
+
+        <!-- Input libre — toujours visible -->
+        <div style="margin-bottom:16px">
+          <label style="font-size:12px;color:var(--ink3);display:block;margin-bottom:6px">Initiale personnalisée</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="text" id="initialeCustomInput" class="field-input"
+              placeholder="ex: Ph." maxlength="5"
+              style="font-size:13px;width:100px"
+              oninput="initialeCustomUpdate()">
+            <span style="font-size:12px;color:var(--ink3)">
+              → <strong id="initialeCustomPreview" style="color:var(--mint)"></strong>
+            </span>
+          </div>
+        </div>
+
+        <!-- Portée : occurrence courante vs toutes -->
+        <div style="border-top:1px solid var(--border);padding-top:14px">
+          <label style="font-size:12px;color:var(--ink3);display:block;margin-bottom:8px">Appliquer à</label>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+              <input type="radio" name="initialePortee" value="toutes" checked
+                style="accent-color:var(--mint)">
+              Toutes les occurrences de <strong id="initialePrenomPortee"></strong>
+            </label>
+            <label id="initialePorteeCurrentLabel" style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+              <input type="radio" name="initialePortee" value="courante"
+                style="accent-color:var(--mint)">
+              Cette occurrence seulement
+            </label>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeInitialeModal()">Annuler</button>
+        <button class="btn-primary" onclick="applyInitiale()"><i data-lucide="check"></i><span>Appliquer</span></button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ══ ALIAS MODAL ══════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="aliasModal" style="display:none" onclick="closeAliasModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Alias pour <strong id="aliasEntityName"></strong></div>
+      <button class="modal-close" onclick="closeAliasModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-desc">
+        Les alias reçoivent le même placeholder. Utile pour les variantes OCR ou les formes abrégées d'une même entité.
+      </p>
+      <div class="alias-list" id="aliasList"></div>
+      <div class="alias-add-row">
+        <input type="text" id="aliasInput" class="field-input mono" placeholder="Entrez un alias puis Entrée…"
+          onkeydown="if(event.key==='Enter') addAlias()">
+        <button class="btn-primary" onclick="addAlias()">+ Ajouter</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-primary" onclick="closeAliasModal()">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Popover sélection texte (step 3) ── -->
+<div id="selectionPopover" class="selection-popover" style="display:none" role="tooltip">
+  <span class="selection-popover-label" id="selectionPopoverLabel"></span>
+  <div class="selection-popover-sep"></div>
+  <button class="selection-popover-btn" onclick="sendToOcr()" title="Créer une règle OCR">
+    <i data-lucide="wrench"></i><span>Règle OCR</span>
+  </button>
+  <button class="selection-popover-btn selection-popover-btn--primary" onclick="sendToEntities()" title="Anonymiser ce terme">
+    <i data-lucide="lock"></i><span>Anonymiser</span>
+  </button>
+  <button class="selection-popover-close" onclick="hideSelectionPopover()" title="Fermer">✕</button>
+</div>
+
+<script src="js/jszip.min.js"></script>
+<script src="js/dict_fr.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/ocr.js"></script>
+<script src="js/analysis.js"></script>
+<script src="js/identity-resolver.js"></script>
+<script src="js/anonymize.js"></script>
+<script src="js/server.js"></script>
+<script src="js/ocrCleaner.js"></script>
+<script src="js/app.js"></script>
+<script src="js/mammoth.min.js"></script>
+
+
+<script>
+// ── Panel collapse toggle ─────────────────────────────────────────
+(function () {
+  const STATE = { left: true, right: true };
+
+  function updateUI() {
+    const left  = document.getElementById('ocrSplitLeft');
+    const right = document.getElementById('ocrSplitRight');
+    const cols  = document.getElementById('ocrSplitCols');
+    const btnL  = document.getElementById('btnCollapseLeft');
+    const btnR  = document.getElementById('btnCollapseRight');
+    if (!left || !right || !cols || !btnL || !btnR) return;
+
+    left.classList.toggle('panel-collapsed', !STATE.left);
+    right.classList.toggle('panel-collapsed', !STATE.right);
+    cols.classList.toggle('one-panel-mode', !STATE.left || !STATE.right);
+
+    if (!STATE.left && STATE.right) {
+      left.style.flex  = '0 0 0px';
+      right.style.flex = '1 1 100%';
+    } else if (STATE.left && !STATE.right) {
+      left.style.flex  = '1 1 100%';
+      right.style.flex = '0 0 0px';
+    } else {
+      left.style.flex  = '';
+      right.style.flex = '';
+    }
+
+    // Flèches : indiquent l'action possible (masquer ou rouvrir)
+    btnL.textContent = STATE.left  ? '◀' : '▶';
+    btnR.textContent = STATE.right ? '▶' : '◀';
+    btnL.classList.toggle('panel-active', !STATE.left);
+    btnR.classList.toggle('panel-active', !STATE.right);
+  }
+
+  window.togglePanel = function (side) {
+    STATE[side] = !STATE[side];
+    updateUI();
+  };
+})();
+</script>
+<!-- ── Modale de chargement ──────────────────────────────────────────────── -->
+<div id="loadingModal" style="display:none" aria-modal="true" role="dialog">
+  <div class="loading-backdrop"></div>
+  <div class="loading-box">
+    <div class="loading-spinner"></div>
+    <div class="loading-msg" id="loadingMsg">Chargement…</div>
+    <div class="loading-progress-wrap">
+      <div class="loading-progress-bar" id="loadingBar"></div>
+    </div>
+    <div class="loading-pct" id="loadingPct"></div>
+    <div class="loading-sub" id="loadingSub"></div>
+    <button class="loading-cancel-btn" id="loadingCancelBtn"
+      onclick="cancelLoading()" style="display:none">
+      <i data-lucide="x"></i><span>Annuler</span>
+    </button>
+  </div>
+</div>
+
+
+  <!-- ══ MODALE VÉRIFICATION OUBLIS AVANT ANONYMISATION ═════════════════ -->
+  <div class="modal-overlay" id="anonCheckOverlay" style="display:none" onclick="event.stopPropagation()">
+    <div class="modal" style="max-width:460px">
+      <div class="modal-header">
+        <h3 class="modal-title"><i data-lucide="alert-triangle"></i><span>Oublis potentiels détectés</span></h3>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--ink2);margin-bottom:12px">
+          Le scan détecte <strong id="anonCheckCount">0</strong> nom(s) non anonymisé(s). Voulez-vous les corriger avant de continuer ?
+        </p>
+        <ul id="anonCheckList" style="font-size:12px;color:var(--ink2);padding-left:18px;margin:0 0 4px;max-height:180px;overflow-y:auto"></ul>
+      </div>
+      <div class="modal-footer" style="gap:8px">
+        <button class="btn-secondary" id="anonCheckCorrect"><i data-lucide="search"></i><span>Corriger les oublis</span></button>
+        <button class="btn-primary"   id="anonCheckContinue"><i data-lucide="lock"></i><span>Anonymiser</span> quand même</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Split-dropdown logic -->
+  <script>
+  // Définition des menus : id du wrapper → items
+  const SPLIT_MENUS = {
+    'sdSauts': [
+      { label: 'Depuis le début', action: 'detectSuspectBreaks()' },
+      { label: 'Depuis ici',      action: 'detectSuspectBreaksFromHere()' }
+    ],
+    'sdEspaces': [
+      { label: 'Depuis le début', action: 'detectSpacedLetters()' },
+      { label: 'Depuis ici',      action: 'detectSpacedLettersFromHere()' }
+    ]
+  };
+
+  // Créer les menus dans le <body> au chargement (hors de tout conteneur)
+  document.addEventListener('DOMContentLoaded', function() {
+    for (const [id, items] of Object.entries(SPLIT_MENUS)) {
+      const menu = document.createElement('div');
+      menu.className = 'split-menu';
+      menu.id = id + 'Menu';
+      menu.dataset.owner = id;
+      items.forEach(item => {
+        const btn = document.createElement('button');
+        btn.textContent = item.label;
+        btn.onclick = function(e) {
+          e.stopPropagation();
+          eval(item.action);
+          closeAllSplitMenus();
+        };
+        menu.appendChild(btn);
+      });
+      document.body.appendChild(menu);
+    }
+  });
+
+  function closeAllSplitMenus() {
+    document.querySelectorAll('.split-menu.open').forEach(m => m.classList.remove('open'));
+  }
+
+  function toggleSplitDropdown(id, event) {
+    if (event) event.stopPropagation();
+    const menu   = document.getElementById(id + 'Menu');
+    const arrow  = document.getElementById(id).querySelector('.split-arrow');
+    const isOpen = menu.classList.contains('open');
+    closeAllSplitMenus();
+    if (!isOpen) {
+      const rect = arrow.getBoundingClientRect();
+      menu.style.top  = (rect.bottom + 4) + 'px';
+      menu.style.left = rect.left + 'px';
+      menu.classList.add('open');
+    }
+  }
+
+  function closeSplitDropdown(id) {
+    const menu = document.getElementById(id + 'Menu');
+    if (menu) menu.classList.remove('open');
+  }
+
+  // Clic extérieur → fermer (avec délai pour laisser toggleSplitDropdown finir)
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.split-arrow')) closeAllSplitMenus();
+  });
+  </script>
+
+  <!-- ══ Modale Recherche / Remplacement (non-bloquante, draggable) ══ -->
+  <div id="rrModal" class="rr-modal" style="display:none;" role="dialog" aria-label="Rechercher / Remplacer">
+    <div class="rr-modal-header" id="rrModalHeader">
+<span class="rr-modal-title" style="flex:1">
+  <i data-lucide="search"></i><span>Rechercher / Remplacer</span>
+</span>
+<button class="modal-close" onclick="closeRRPanel()" title="Fermer (Échap)">
+  <i data-lucide="x"></i>
+</button>    </div>
+    <div class="rr-modal-body">
+      <!-- Ligne Rechercher -->
+      <div class="rr-row">
+        <label class="rr-label">Rechercher</label>
+        <div class="rr-field-wrap">
+          <input id="rrQuery" type="text" class="rr-field"
+            placeholder="Terme à rechercher…"
+            oninput="rrScan()"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();event.shiftKey?rrNavigate(-1):rrNavigate(1)} if(event.key==='Escape')closeRRPanel();"
+            autocomplete="off" spellcheck="false" />
+          <span id="rrCount" class="rr-field-count"></span>
+          <button class="rr-nav-btn" onclick="rrNavigate(-1)" title="Précédent (Maj+Entrée)">↑</button>
+          <button class="rr-nav-btn" onclick="rrNavigate(1)"  title="Suivant (Entrée)">↓</button>
+        </div>
+      </div>
+      <!-- Ligne Remplacer -->
+      <div class="rr-row">
+        <label class="rr-label">Remplacer par</label>
+        <div class="rr-field-wrap">
+          <input id="rrReplace" type="text" class="rr-field"
+            placeholder="Texte de remplacement…"
+              oninput="RR.replace = this.value"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();rrReplace(false)} if(event.key==='Escape')closeRRPanel();"
+            autocomplete="off" spellcheck="false" />
+        </div>
+      </div>
+      <!-- Options + boutons -->
+      <div class="rr-footer">
+        <div class="rr-opts">
+          <label class="rr-opt" title="Expression régulière">
+            <input type="checkbox" id="rrRegex" onchange="rrScan()"> <code>.*</code> Regex
+          </label>
+          <label class="rr-opt" title="Sensible à la casse">
+            <input type="checkbox" id="rrCase" onchange="rrScan()"> Aa Casse
+          </label>
+        </div>
+        <div class="rr-actions">
+          <button class="btn-sm btn-rr-one" onclick="rrReplace(false)" title="Remplacer l'occurrence courante (Entrée)"><i data-lucide="corner-down-left"></i><span>Rempl. 1</span></button>
+          <button class="btn-sm btn-rr-all" onclick="rrReplace(true)"  title="Remplacer toutes les occurrences"><i data-lucide="zap"></i><span>Tout rempl.</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<!-- ══ Icônes Lucide ══════════════════════════════════════════════════════ -->
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script>
+  (function(){
+    function renderIcons(){ if (window.lucide && lucide.createIcons) lucide.createIcons(); }
+    // Initial render
+    if (document.readyState !== 'loading') renderIcons();
+    else document.addEventListener('DOMContentLoaded', renderIcons);
+
+    // Re-render after JS-injected content (entities table, ctx menu, etc.)
+    var ro = new MutationObserver(function(muts){
+      var needs = false;
+      for (var i=0;i<muts.length;i++){
+        var m = muts[i];
+        for (var j=0;j<m.addedNodes.length;j++){
+          var n = m.addedNodes[j];
+          if (n.nodeType === 1 && (n.querySelector?.('[data-lucide]') || n.matches?.('[data-lucide]'))) { needs = true; break; }
+        }
+        if (needs) break;
+      }
+      if (needs) renderIcons();
+    });
+    document.addEventListener('DOMContentLoaded', function(){
+      ro.observe(document.body, { childList: true, subtree: true });
+    });
+
+    // Reflect the active theme segment when the drawer opens
+    function syncThemeSeg(){
+      var t = document.documentElement.getAttribute('data-theme') || 'dark';
+      document.querySelectorAll('.theme-seg').forEach(function(b){
+        b.classList.toggle('is-active', b.dataset.themeSet === t);
+      });
+    }
+    document.addEventListener('DOMContentLoaded', syncThemeSeg);
+
+    // Sync stepper state — listens to anything that touches step-btn.active
+    function syncStepper(){
+      document.querySelectorAll('.step-btn').forEach(function(btn){
+        var done = btn.classList.contains('done');
+        var active = btn.classList.contains('active');
+        btn.setAttribute('data-state', done ? 'done' : (active ? 'active' : (btn.disabled ? 'locked' : 'ready')));
+      });
+    }
+    var stepObs = new MutationObserver(syncStepper);
+    document.addEventListener('DOMContentLoaded', function(){
+      document.querySelectorAll('.step-btn').forEach(function(b){ stepObs.observe(b, { attributes: true, attributeFilter: ['class','disabled'] }); });
+      syncStepper();
+    });
+
+    // Patch server status badge — wraps text inside the existing #serverStatusBar
+    // so the existing JS (which writes textContent / innerHTML) still works.
+    // We add a MutationObserver that translates the legacy strings into the
+    // new badge shape without altering app.js.
+    function classifyStatus(txt){
+      var t = (txt||'').toLowerCase();
+      if (/(ok|prêt|connecté|en ligne|✓)/.test(t)) return 'ok';
+      if (/(erreur|hors|déconnect|✗|✕)/.test(t)) return 'err';
+      if (/(connexion|chargement|⏳|…)/.test(t)) return 'checking';
+      if (/(attention|warning|⚠)/.test(t)) return 'warn';
+      return null;
+    }
+    var bar = null;
+    function normalizeBar(){
+      if (!bar) bar = document.getElementById('serverStatusBar');
+      if (!bar) return;
+      // If app.js wrote raw text, normalize into dot + label
+      var hasDot = bar.querySelector('.server-dot');
+      if (!hasDot){
+        var raw = bar.textContent.trim().replace(/^[⏳✓✕✗⚠️⚠]\s*/, '');
+        bar.innerHTML = '<span class="server-dot"></span><span class="server-label">' + raw + '</span>';
+      }
+      var lbl = bar.querySelector('.server-label');
+      var kind = classifyStatus(lbl ? lbl.textContent : bar.textContent);
+      bar.classList.remove('server-badge--ok','server-badge--err','server-badge--checking','server-badge--warn');
+      if (kind) bar.classList.add('server-badge--' + kind);
+      if (!bar.classList.contains('server-badge')) bar.classList.add('server-badge');
+    }
+    document.addEventListener('DOMContentLoaded', function(){
+      normalizeBar();
+      var b = document.getElementById('serverStatusBar');
+      if (b){
+        new MutationObserver(normalizeBar).observe(b, { childList: true, characterData: true, subtree: true });
+      }
+    });
+
+    // Toggle the settings backdrop alongside the panel
+    var origToggle = window.toggleSettings;
+    window.toggleSettings = function(){
+      var p = document.getElementById('settingsPanel');
+      var b = document.getElementById('settingsBackdrop');
+      // If app.js already defines toggleSettings, defer to it for state changes
+      if (typeof origToggle === 'function') origToggle.apply(this, arguments);
+      else if (p) p.style.display = (p.style.display === 'none' || !p.style.display) ? '' : 'none';
+      // Sync backdrop
+      requestAnimationFrame(function(){
+        var open = p && p.style.display !== 'none';
+        if (b) b.style.display = open ? '' : 'none';
+        document.body.classList.toggle('settings-open', !!open);
+      });
+    };
+  })();
+</script>
+
+</body>
+</html>

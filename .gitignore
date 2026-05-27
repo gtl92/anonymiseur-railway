@@ -1,0 +1,8 @@
+node_modules/
+tmp/
+.env
+*.log
+
+# Données persistantes (à conserver via Railway volumes ou exclure du dépôt)
+# data/blacklist.json
+# data/custom_types.json

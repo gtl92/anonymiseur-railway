@@ -1,0 +1,23 @@
+{
+  "name": "anonymiseur-judiciaire",
+  "version": "2.9.0",
+  "description": "Anonymiseur judiciaire — serveur Node.js pour Railway",
+  "type": "module",
+  "engines": {
+    "node": "18.x"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "mammoth": "^1.8.0",
+    "multer": "^1.4.5-lts.1",
+    "pdf-parse": "^1.1.1",
+    "pdfjs-dist": "^5.7.284",
+    "tesseract.js": "^5.0.5"
+  }
+}
