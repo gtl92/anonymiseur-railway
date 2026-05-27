@@ -12,8 +12,6 @@ import path          from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { createWorker } from 'tesseract.js';
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
-import { createCanvas } from '@napi-rs/canvas';
 
 const require    = createRequire(import.meta.url);
 const __dirname  = path.dirname(fileURLToPath(import.meta.url));
@@ -79,26 +77,10 @@ async function extractPdfNative(buffer) {
   } catch { return ''; }
 }
 
-async function extractPdfOcr(buffer) {
-  const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(buffer) });
-  const pdfDoc = await loadingTask.promise;
-  const worker = await createWorker('fra');
-  const texts = [];
-  try {
-    for (let i = 1; i <= pdfDoc.numPages; i++) {
-      const page     = await pdfDoc.getPage(i);
-      const viewport = page.getViewport({ scale: 2.0 });
-      const canvas   = createCanvas(viewport.width, viewport.height);
-      const ctx      = canvas.getContext('2d');
-      await page.render({ canvasContext: ctx, viewport }).promise;
-      const imgBuffer = canvas.toBuffer('image/png');
-      const { data: { text } } = await worker.recognize(imgBuffer);
-      texts.push(text.trim());
-    }
-  } finally {
-    await worker.terminate();
-  }
-  return texts.join('\n\n');
+async function extractPdfOcr(_buffer) {
+  // OCR de PDF scanné non supporté sans moteur de rendu PDF côté serveur.
+  // Le fallback dans extractPdf() retournera method:'ocr_unavailable'.
+  throw new Error('ocr_unavailable');
 }
 
 /**
