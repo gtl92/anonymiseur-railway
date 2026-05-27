@@ -3433,12 +3433,21 @@ function clearBlacklist() {
 
 // ── Gestionnaire types personnalisés ─────────────────────────────────────────
 
-function openTypeManager() {
-  // Charger depuis localStorage
-  const saved = localStorage.getItem('customTypes');
-  if (saved) {
-    try { State.customTypes = JSON.parse(saved); } catch {}
-  }
+async function openTypeManager() {
+  try {
+    const serverTypes = await Server.loadCustomTypes();
+    if (serverTypes.length > 0) {
+      State.customTypes = serverTypes;
+      localStorage.setItem('customTypes', JSON.stringify(serverTypes));
+    } else {
+      // Fallback cache local si le serveur est vide
+      const saved = localStorage.getItem('customTypes');
+      if (saved) {
+        try { State.customTypes = JSON.parse(saved); } catch {}
+        if (State.customTypes.length > 0) Server.saveCustomTypes(State.customTypes).catch(() => {});
+      }
+    }
+  } catch {}
   renderTypeManager();
   document.getElementById('typeManager').style.display = 'block';
   document.getElementById('settingsPanel').style.display = 'none';
