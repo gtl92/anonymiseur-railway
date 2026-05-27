@@ -1,8 +1,8 @@
 [build]
-builder = "nixpacks"
+builder = "RAILPACK"
 
 [deploy]
 startCommand    = "node server.js"
 healthcheckPath = "/api/status"
 healthcheckTimeout = 300
-restartPolicyType  = "on_failure"
+restartPolicyType  = "ON_FAILURE"
