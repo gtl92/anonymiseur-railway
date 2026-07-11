@@ -1,6 +1,7 @@
 /**
- * server.js — Anonymiseur judiciaire v2.9 (Railway / Node.js)
- * Remplace serveur_local.py — même API JSON, même format de réponse.
+ * server.js — Anonymiseur judiciaire v2.10 (VPS IONOS / Node.js)
+ * OCR PDF scanné : poppler-utils (pdftoppm) + tesseract.js
+ * Ne dépend PLUS de pdfjs-dist ni de @napi-rs/canvas (source du bug DOMMatrix sur Railway).
  */
 
 import 'dotenv/config';
@@ -9,23 +10,35 @@ import multer        from 'multer';
 import cors          from 'cors';
 import { promises as fs } from 'fs';
 import path          from 'path';
+import os            from 'os';
+import crypto        from 'crypto';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
+import { execFile }  from 'child_process';
+import { promisify } from 'util';
 import { createWorker } from 'tesseract.js';
 
-const require    = createRequire(import.meta.url);
-const __dirname  = path.dirname(fileURLToPath(import.meta.url));
+const require       = createRequire(import.meta.url);
+const __dirname     = path.dirname(fileURLToPath(import.meta.url));
+const execFileAsync = promisify(execFile);
 
 const PORT       = process.env.PORT       || 3000;
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, 'tmp', 'uploads');
+const OCR_DIR     = path.join(__dirname, 'tmp', 'ocr');
 const DATA_DIR   = path.join(__dirname, 'data');
 const BLACKLIST_FILE    = path.join(DATA_DIR, 'blacklist.json');
 const CUSTOM_TYPES_FILE = path.join(DATA_DIR, 'custom_types.json');
-const VERSION    = '2.9';
+const VERSION    = '2.10';
+
+// Dossier des données linguistiques Tesseract installées via apt
+// (détecté et écrit dans .env par install-vps.sh — voir TESSDATA_PATH).
+const TESSDATA_PATH = process.env.TESSDATA_PATH || '/usr/share/tesseract-ocr/5/tessdata';
+const OCR_DPI        = Number(process.env.OCR_DPI || 300);
 
 // ── Initialisation des dossiers ───────────────────────────────────────────────
 
 await fs.mkdir(UPLOAD_DIR, { recursive: true });
+await fs.mkdir(OCR_DIR,    { recursive: true });
 await fs.mkdir(DATA_DIR,   { recursive: true });
 
 // ── Détection des dépendances optionnelles ────────────────────────────────────
@@ -34,8 +47,16 @@ function tryRequire(id) {
   try { require.resolve(id); return true; } catch { return false; }
 }
 
-const HAS_PDF_PARSE  = tryRequire('pdf-parse');
-const HAS_MAMMOTH    = tryRequire('mammoth');
+const HAS_PDF_PARSE = tryRequire('pdf-parse');
+const HAS_MAMMOTH   = tryRequire('mammoth');
+
+async function popplerOk() {
+  try {
+    await execFileAsync('pdftoppm', ['-v']);
+    return true;
+  } catch { return false; }
+}
+const HAS_POPPLER = await popplerOk();
 
 // ── Persistance ───────────────────────────────────────────────────────────────
 
@@ -65,30 +86,69 @@ async function saveCustomTypes(types) {
   await fs.writeFile(CUSTOM_TYPES_FILE, JSON.stringify(types, null, 2), 'utf-8');
 }
 
-// ── Extraction PDF ────────────────────────────────────────────────────────────
+// ── Extraction PDF texte natif ────────────────────────────────────────────────
 
 async function extractPdfNative(buffer) {
   if (!HAS_PDF_PARSE) return '';
   try {
-    // Import via lib/ pour éviter le chargement du fichier de test intégré
     const pdfParse = require('pdf-parse/lib/pdf-parse.js');
     const result = await pdfParse(buffer);
     return (result.text || '').trim();
   } catch { return ''; }
 }
 
-async function extractPdfOcr(_buffer) {
-  // OCR de PDF scanné non supporté sans moteur de rendu PDF côté serveur.
-  // Le fallback dans extractPdf() retournera method:'ocr_unavailable'.
-  throw new Error('ocr_unavailable');
+// ── OCR PDF scanné : pdftoppm (rasterisation) + tesseract.js (reconnaissance) ──
+
+async function pdfToPngPages(buffer) {
+  const id       = crypto.randomBytes(8).toString('hex');
+  const pdfPath  = path.join(OCR_DIR, `${id}.pdf`);
+  const prefix   = path.join(OCR_DIR, `${id}-page`);
+
+  await fs.writeFile(pdfPath, buffer);
+  try {
+    // -r 300 : 300 dpi, bon compromis qualité OCR / temps de traitement
+    await execFileAsync('pdftoppm', ['-r', String(OCR_DPI), '-png', pdfPath, prefix]);
+  } finally {
+    fs.unlink(pdfPath).catch(() => {});
+  }
+
+  const files = (await fs.readdir(OCR_DIR))
+    .filter(f => f.startsWith(`${id}-page`) && f.endsWith('.png'))
+    .sort()
+    .map(f => path.join(OCR_DIR, f));
+
+  return files;
+}
+
+async function extractPdfOcr(buffer) {
+  if (!HAS_POPPLER) throw new Error('ocr_unavailable');
+
+  const pages = await pdfToPngPages(buffer);
+  if (pages.length === 0) throw new Error('ocr_unavailable');
+
+  const worker = await createWorker('fra', 1, {
+    langPath: TESSDATA_PATH,
+    gzip: false, // les .traineddata installés via apt ne sont pas gzippés
+  });
+
+  try {
+    const texts = [];
+    for (const pagePath of pages) {
+      const { data } = await worker.recognize(pagePath);
+      texts.push(data.text || '');
+    }
+    return texts.join('\n\n').trim();
+  } finally {
+    await worker.terminate();
+    await Promise.all(pages.map(p => fs.unlink(p).catch(() => {})));
+  }
 }
 
 /**
  * Tente l'extraction native en premier.
- * Si texte insuffisant (<50 chars/page), bascule sur OCR.
+ * Si texte insuffisant (<50 chars/page), bascule sur OCR (poppler + tesseract.js).
  */
 async function extractPdf(buffer) {
-  // Compte de pages approximatif (comme en Python)
   const raw       = buffer.toString('binary');
   const pageCount = Math.max(1, (raw.match(/\/Page /g) || []).length);
   const native    = await extractPdfNative(buffer);
@@ -100,8 +160,11 @@ async function extractPdf(buffer) {
   try {
     const text = await extractPdfOcr(buffer);
     return { text, method: 'ocr' };
-  } catch {
-    return { text: native, method: 'ocr_unavailable' };
+  } catch (e) {
+    if (e.message === 'ocr_unavailable') {
+      return { text: native, method: 'ocr_unavailable' };
+    }
+    throw new Error(`ocr_error:${e.message}`);
   }
 }
 
@@ -129,8 +192,9 @@ app.get('/api/status', (_req, res) => {
   res.json({
     ok:        true,
     version:   VERSION,
-    tesseract: true,
-    pdfminer:  HAS_PDF_PARSE, // même clé qu'en Python pour compatibilité frontend
+    tesseract: HAS_POPPLER,
+    poppler:   HAS_POPPLER,
+    pdfminer:  HAS_PDF_PARSE, // clé conservée pour compat frontend existant
     docx:      HAS_MAMMOTH,
   });
 });
@@ -205,10 +269,12 @@ app.post('/api/extract', upload.single('file'), async (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   const bar = '='.repeat(52);
   console.log(`\n${bar}`);
-  console.log(`  Anonymiseur judiciaire v${VERSION} — Railway/Node.js`);
+  console.log(`  Anonymiseur judiciaire v${VERSION} — VPS IONOS`);
   console.log(bar);
   console.log(`  URL       : http://0.0.0.0:${PORT}`);
-  console.log(`  OCR       : ✓ tesseract.js actif`);
+  console.log(`  Poppler   : ${HAS_POPPLER    ? '✓ pdftoppm détecté'  : '✗ absent (OCR indisponible)'}`);
+  console.log(`  OCR       : ${HAS_POPPLER    ? '✓ tesseract.js prêt' : '✗ indisponible'}`);
+  console.log(`  Tessdata  : ${TESSDATA_PATH}`);
   console.log(`  PDF       : ${HAS_PDF_PARSE  ? '✓ pdf-parse'         : '✗ absent'}`);
   console.log(`  DOCX      : ${HAS_MAMMOTH    ? '✓ mammoth'           : '✗ absent'}`);
   console.log(bar + '\n');

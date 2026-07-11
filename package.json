@@ -1,17 +1,16 @@
 {
   "name": "anonymiseur-judiciaire",
-  "version": "2.9.0",
-  "description": "Anonymiseur judiciaire — serveur Node.js pour Railway",
+  "version": "2.10.0",
+  "description": "Anonymiseur judiciaire — serveur Node.js (VPS IONOS)",
   "type": "module",
   "engines": {
-    "node": "18.x"
+    "node": ">=18"
   },
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js"
   },
   "dependencies": {
-    "@napi-rs/canvas": "^1.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
