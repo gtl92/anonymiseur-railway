@@ -108,6 +108,13 @@ async function pdfToPngPages(buffer) {
   try {
     // -r 300 : 300 dpi, bon compromis qualité OCR / temps de traitement
     await execFileAsync('pdftoppm', ['-r', String(OCR_DPI), '-png', pdfPath, prefix]);
+  } catch (err) {
+    // pdftoppm peut avoir écrit des pages partielles avant l'échec : les purger.
+    const partial = (await fs.readdir(OCR_DIR).catch(() => []))
+      .filter(f => f.startsWith(`${id}-page`))
+      .map(f => path.join(OCR_DIR, f));
+    await Promise.all(partial.map(p => fs.unlink(p).catch(() => {})));
+    throw err;
   } finally {
     fs.unlink(pdfPath).catch(() => {});
   }
@@ -126,12 +133,12 @@ async function extractPdfOcr(buffer) {
   const pages = await pdfToPngPages(buffer);
   if (pages.length === 0) throw new Error('ocr_unavailable');
 
-  const worker = await createWorker('fra', 1, {
-    langPath: TESSDATA_PATH,
-    gzip: false, // les .traineddata installés via apt ne sont pas gzippés
-  });
-
+  let worker;
   try {
+    worker = await createWorker('fra', 1, {
+      langPath: TESSDATA_PATH,
+      gzip: false, // les .traineddata installés via apt ne sont pas gzippés
+    });
     const texts = [];
     for (const pagePath of pages) {
       const { data } = await worker.recognize(pagePath);
@@ -139,7 +146,7 @@ async function extractPdfOcr(buffer) {
     }
     return texts.join('\n\n').trim();
   } finally {
-    await worker.terminate();
+    if (worker) await worker.terminate();
     await Promise.all(pages.map(p => fs.unlink(p).catch(() => {})));
   }
 }
@@ -183,7 +190,17 @@ const upload = multer({
   limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB
 });
 
-app.use(cors({ origin: '*' }));
+// CORS restreint : le front est servi par ce même serveur (express.static),
+// donc aucune origine externe n'est nécessaire en production. ALLOWED_ORIGINS
+// permet d'ouvrir explicitement des origines de dev/tierces si besoin.
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin: ALLOWED_ORIGINS.length > 0 ? ALLOWED_ORIGINS : false,
+}));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
