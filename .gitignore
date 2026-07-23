@@ -3,6 +3,8 @@ tmp/
 .env
 *.log
 
-# Données persistantes (à conserver via Railway volumes ou exclure du dépôt)
-# data/blacklist.json
-# data/custom_types.json
+# Données persistantes modifiées en prod par l'app (état runtime, pas du code) :
+# on ne les versionne plus pour éviter qu'un déploiement écrase les valeurs
+# réelles avec les valeurs d'exemple du dépôt.
+data/blacklist.json
+data/custom_types.json
