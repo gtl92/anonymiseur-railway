@@ -127,6 +127,12 @@ async function pdfToPngPages(buffer) {
   return files;
 }
 
+/**
+ * OCR + position des mots par page (pour le surlignage direct sur l'image
+ * côté client — cf. anonymiseur front). Les PNG de page ne sont JAMAIS
+ * conservés sur disque : lus en mémoire (base64) puis supprimés comme avant
+ * (cf. DEPLOY.md — tmp/ocr doit rester vide après traitement).
+ */
 async function extractPdfOcr(buffer) {
   if (!HAS_POPPLER) throw new Error('ocr_unavailable');
 
@@ -139,12 +145,25 @@ async function extractPdfOcr(buffer) {
       langPath: TESSDATA_PATH,
       gzip: false, // les .traineddata installés via apt ne sont pas gzippés
     });
-    const texts = [];
+    const texts      = [];
+    const pageBoxes  = [];
+    const pageImages = [];
     for (const pagePath of pages) {
       const { data } = await worker.recognize(pagePath);
       texts.push(data.text || '');
+      const words = (data.words || [])
+        .filter(w => w.text && w.text.trim())
+        .map(w => ({
+          text: w.text,
+          x0: w.bbox?.x0 ?? 0, y0: w.bbox?.y0 ?? 0,
+          x1: w.bbox?.x1 ?? 0, y1: w.bbox?.y1 ?? 0,
+        }));
+      pageBoxes.push({ words });
+      // Image lue en mémoire (pas de route statique) : cf. commentaire ci-dessus.
+      const png = await fs.readFile(pagePath);
+      pageImages.push(`data:image/png;base64,${png.toString('base64')}`);
     }
-    return texts.join('\n\n').trim();
+    return { text: texts.join('\n\n').trim(), pageBoxes, pageImages };
   } finally {
     if (worker) await worker.terminate();
     await Promise.all(pages.map(p => fs.unlink(p).catch(() => {})));
@@ -165,8 +184,8 @@ async function extractPdf(buffer) {
   }
 
   try {
-    const text = await extractPdfOcr(buffer);
-    return { text, method: 'ocr' };
+    const { text, pageBoxes, pageImages } = await extractPdfOcr(buffer);
+    return { text, method: 'ocr', pageBoxes, pageImages };
   } catch (e) {
     if (e.message === 'ocr_unavailable') {
       return { text: native, method: 'ocr_unavailable' };

@@ -585,6 +585,11 @@
 
             <!-- Panneau PDF (step 2) -->
             <div id="leftPdfPanel" class="left-panel">
+              <!-- Rendu du PDF source avec les entités surlignées directement dessus
+                   (texte natif via pdfjs, ou pages OCR + positions serveur).
+                   Remplace l'iframe brute quand disponible ; repli automatique
+                   sur l'iframe sinon (DOCX/TXT référencé, échec de rendu). -->
+              <div id="pdfOverlayWrap" class="pdfov-wrap" style="display:none"></div>
               <iframe id="pdfPreview" class="split-pdf" style="display:none" title="PDF original"></iframe>
               <div id="splitDocxPreview" class="split-docx-viewer" style="display:none"></div>
               <div class="viewer-wrap" id="origViewerWrap" style="display:none; flex:1; min-height:0">
@@ -1366,6 +1371,8 @@
 <script src="js/anonymize.js"></script>
 <script src="js/server.js"></script>
 <script src="js/ocrCleaner.js"></script>
+<script src="js/vendor/pdfjs/pdf.min.js"></script>
+<script src="js/pdf-overlay.js"></script>
 <script src="js/app.js"></script>
 <script src="js/mammoth.min.js"></script>
 
