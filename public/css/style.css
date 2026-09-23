@@ -1642,6 +1642,30 @@ body:not(.step3-active) #btnSearchUncovered {
 
 /* ── 17. Entity table ────────────────────────────────────────────────────── */
 /* ── Barre entités compacte ─────────────────────────────────────────────── */
+.entity-quick-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-2);
+  flex-shrink: 0;
+}
+.entity-quick-add .field-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  padding: 6px 8px;
+}
+.entity-quick-add .entity-type-filter {
+  max-width: 100px;
+  flex-shrink: 0;
+}
+.entity-quick-add .btn-sm {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .entity-toolbar-compact {
   display: flex;
   align-items: center;

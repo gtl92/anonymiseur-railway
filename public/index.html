@@ -612,6 +612,21 @@
             <!-- Panneau Entités (step 3) -->
             <div id="leftEntitiesPanel" class="left-panel" style="display:none">
 
+              <!-- Ajout rapide : un nom, une adresse, un numéro… -->
+              <div class="entity-quick-add">
+                <input type="text" id="entityQuickAddInput" class="field-input"
+                  placeholder="Un nom, une adresse, un numéro…"
+                  onkeydown="if(event.key==='Enter') addEntityQuick()">
+                <select id="entityQuickAddType" class="entity-type-filter" title="Type">
+                  <option value="NOM">Nom</option>
+                  <option value="ENTITE">Entreprise</option>
+                  <option value="ADRESSE">Adresse</option>
+                  <option value="REF">Référence</option>
+                  <option value="AUTRE">Autre</option>
+                </select>
+                <button class="btn-sm btn-primary" onclick="addEntityQuick()">+ Ajouter</button>
+              </div>
+
               <!-- Barre compacte une ligne -->
               <div class="entity-toolbar-compact">
                 <div class="search-box entity-search-box">
@@ -645,7 +660,7 @@
                     <button onclick="mergeDuplicateEntities(); closeEbarActions()" title="Fusionner les entités cochées">
                       <i data-lucide="wand-2"></i><span>Fusionner la sélection</span>
                     </button>
-                    <button onclick="addEntityManual(); closeEbarActions()" title="Ajouter une entité manuellement">
+                    <button onclick="focusEntityQuickAdd(); closeEbarActions()" title="Ajouter une entité manuellement">
                       <i data-lucide="plus"></i><span>Ajouter manuellement</span>
                     </button>
                     <button onclick="toggleOublisPanel(); closeEbarActions()" title="Vérifier les oublis d'anonymisation">

@@ -2909,21 +2909,49 @@ function closeScanOublis()       { ScanOublis.close(); }
 function runScanOublis()         { ScanOublis.run(); }
 function scanFilterCat(btn, cat) { ScanOublis.filterCat(btn, cat); }
 
-function addEntityManual() {
-  const val = prompt('Valeur à anonymiser :');
-  if (!val || !val.trim()) return;
-  const v = val.trim();
+/** Crée et insère une entité manuelle ; retourne false si valeur vide/déjà présente. */
+function createManualEntity(value, type) {
+  const v = (value || '').trim();
+  if (!v) return false;
   if (State.entities.some(e => e.value.toLowerCase() === v.toLowerCase())) {
-    showToast('Cette valeur est déjà dans la liste'); return;
+    showToast('Cette valeur est déjà dans la liste'); return false;
   }
+  const t = type || 'NOM';
   State.entities.unshift({
     id: `man_${Date.now()}`,
-    value: v, type: 'NOM', label: 'NOM',
+    value: v, type: t, label: t,
     occurrences: 0, aliases: [],
     active: true, blocked: false, manual: true
   });
   renderEntityTable(State.entities);
   if (State.currentStep === 3) setTimeout(() => refreshEntityViewer(), 0);
+  return true;
+}
+
+function addEntityManual() {
+  const val = prompt('Valeur à anonymiser :');
+  createManualEntity(val, 'NOM');
+}
+
+/** Ajout rapide depuis le champ visible en haut du panneau Entités (step 3). */
+function addEntityQuick() {
+  const input = document.getElementById('entityQuickAddInput');
+  const typeSel = document.getElementById('entityQuickAddType');
+  if (!input) return;
+  const ok = createManualEntity(input.value, typeSel ? typeSel.value : 'NOM');
+  if (ok) {
+    input.value = '';
+    showToast('Entité ajoutée');
+  }
+  input.focus();
+}
+
+/** Amène le focus sur le champ d'ajout rapide (depuis le menu Actions). */
+function focusEntityQuickAdd() {
+  const input = document.getElementById('entityQuickAddInput');
+  if (!input) return;
+  input.focus();
+  input.select();
 }
 
 // ── Import entités (JSON/CSV) ─────────────────────────────────────────────────
