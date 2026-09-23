@@ -1235,6 +1235,36 @@ body.settings-open { overflow: hidden; }
   background: #fff;
 }
 
+/* Rendu du PDF avec surlignage direct des entités (cf. js/pdf-overlay.js) */
+.pdfov-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--bg-3);
+  padding: 12px;
+}
+.pdfov-page {
+  position: relative;
+  margin: 0 auto 16px;
+  width: fit-content;
+  line-height: 0; /* évite l'espace fantôme sous canvas/img */
+  box-shadow: 0 1px 4px rgba(0,0,0,.15);
+}
+.pdfov-page canvas,
+.pdfov-page img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+.pdfov-hl {
+  position: absolute;
+  background: var(--brand-100);
+  border: 1px solid var(--brand);
+  border-radius: 2px;
+  opacity: 0.55;
+  cursor: help;
+}
+
 /* Placeholder col gauche */
 .split-placeholder {
   flex: 1; display: flex; flex-direction: column;
@@ -1642,6 +1672,30 @@ body:not(.step3-active) #btnSearchUncovered {
 
 /* ── 17. Entity table ────────────────────────────────────────────────────── */
 /* ── Barre entités compacte ─────────────────────────────────────────────── */
+.entity-quick-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-2);
+  flex-shrink: 0;
+}
+.entity-quick-add .field-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  padding: 6px 8px;
+}
+.entity-quick-add .entity-type-filter {
+  max-width: 100px;
+  flex-shrink: 0;
+}
+.entity-quick-add .btn-sm {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .entity-toolbar-compact {
   display: flex;
   align-items: center;

@@ -597,6 +597,9 @@ async function loadFile(file) {
 
   // Libérer l'ancien blob URL si existant
   if (State.sourceBlobUrl) { URL.revokeObjectURL(State.sourceBlobUrl); State.sourceBlobUrl = null; }
+  State.pageBoxes  = null;
+  State.pageImages = null;
+  if (typeof PdfOverlay !== 'undefined') PdfOverlay.clear();
 
   let text = '', method = 'txt';
 
@@ -636,6 +639,10 @@ async function loadFile(file) {
       });
       text   = result.text   || '';
       method = result.method || ext;
+      // Positions par mot pour le surlignage direct sur le document (step 3) —
+      // uniquement présentes pour un PDF passé par l'OCR (cf. server.js).
+      State.pageBoxes  = result.pageBoxes  || null;
+      State.pageImages = result.pageImages || null;
       // Stocker le blob URL pour preview PDF
       if (ext === 'pdf') {
         State.sourceBlobUrl = URL.createObjectURL(file);
@@ -2909,21 +2916,49 @@ function closeScanOublis()       { ScanOublis.close(); }
 function runScanOublis()         { ScanOublis.run(); }
 function scanFilterCat(btn, cat) { ScanOublis.filterCat(btn, cat); }
 
-function addEntityManual() {
-  const val = prompt('Valeur à anonymiser :');
-  if (!val || !val.trim()) return;
-  const v = val.trim();
+/** Crée et insère une entité manuelle ; retourne false si valeur vide/déjà présente. */
+function createManualEntity(value, type) {
+  const v = (value || '').trim();
+  if (!v) return false;
   if (State.entities.some(e => e.value.toLowerCase() === v.toLowerCase())) {
-    showToast('Cette valeur est déjà dans la liste'); return;
+    showToast('Cette valeur est déjà dans la liste'); return false;
   }
+  const t = type || 'NOM';
   State.entities.unshift({
     id: `man_${Date.now()}`,
-    value: v, type: 'NOM', label: 'NOM',
+    value: v, type: t, label: t,
     occurrences: 0, aliases: [],
     active: true, blocked: false, manual: true
   });
   renderEntityTable(State.entities);
   if (State.currentStep === 3) setTimeout(() => refreshEntityViewer(), 0);
+  return true;
+}
+
+function addEntityManual() {
+  const val = prompt('Valeur à anonymiser :');
+  createManualEntity(val, 'NOM');
+}
+
+/** Ajout rapide depuis le champ visible en haut du panneau Entités (step 3). */
+function addEntityQuick() {
+  const input = document.getElementById('entityQuickAddInput');
+  const typeSel = document.getElementById('entityQuickAddType');
+  if (!input) return;
+  const ok = createManualEntity(input.value, typeSel ? typeSel.value : 'NOM');
+  if (ok) {
+    input.value = '';
+    showToast('Entité ajoutée');
+  }
+  input.focus();
+}
+
+/** Amène le focus sur le champ d'ajout rapide (depuis le menu Actions). */
+function focusEntityQuickAdd() {
+  const input = document.getElementById('entityQuickAddInput');
+  if (!input) return;
+  input.focus();
+  input.select();
 }
 
 // ── Import entités (JSON/CSV) ─────────────────────────────────────────────────
@@ -5169,6 +5204,51 @@ function switchViewerTab(tab) {
   }
 }
 
+// ── Surlignage des entités directement sur le rendu du PDF (step 2/3) ───────
+// PdfOverlay.loadNative/loadOcr est coûteux (rend chaque page) : on ne le
+// relance que si l'URL source a changé, sinon on se contente de redessiner
+// les surlignages (highlight() est bon marché).
+let _pdfOverlayBuiltFor = null;
+
+async function _buildPdfOverlay(pdfUrl) {
+  const wrap   = document.getElementById('pdfOverlayWrap');
+  const iframe = document.getElementById('pdfPreview');
+  if (!wrap || typeof PdfOverlay === 'undefined') return;
+
+  if (_pdfOverlayBuiltFor === pdfUrl && PdfOverlay.isReady()) {
+    wrap.style.display = 'block';
+    if (iframe) iframe.style.display = 'none';
+    PdfOverlay.highlight(State.entities);
+    return;
+  }
+
+  let ok = false;
+  if (State.pageImages && State.pageImages.length) {
+    // PDF scanné (OCR) : images + positions par mot déjà fournies par le serveur.
+    ok = PdfOverlay.loadOcr(State.pageImages, State.pageBoxes, wrap);
+  } else {
+    // PDF texte natif : rendu et positionnement 100% navigateur (pdfjs).
+    ok = await PdfOverlay.loadNative(pdfUrl, wrap);
+  }
+
+  if (ok) {
+    _pdfOverlayBuiltFor = pdfUrl;
+    wrap.style.display = 'block';
+    if (iframe) iframe.style.display = 'none';
+    PdfOverlay.highlight(State.entities);
+  } else {
+    // Repli silencieux sur l'iframe brute (ex : pdfjs indisponible/échec de rendu).
+    _pdfOverlayBuiltFor = null;
+    wrap.style.display = 'none';
+    if (iframe) iframe.style.display = 'block';
+  }
+}
+
+function _hidePdfOverlay() {
+  const wrap = document.getElementById('pdfOverlayWrap');
+  if (wrap) wrap.style.display = 'none';
+}
+
 async function initOriginalPreview() {
   // ── Réinitialiser tous les viewers (rechargement) ────────────────────────
   const _pdf    = document.getElementById('step1PdfPreview');
@@ -5268,6 +5348,7 @@ async function initOriginalPreview() {
     if (placeholder) placeholder.style.display = 'flex';
     if (pdfIframe)   pdfIframe.style.display   = 'none';
     _hideOriginalViewer();
+    _hidePdfOverlay();
     if (noDoc)       noDoc.style.display        = 'inline';
     if (btnOpenSrc)  btnOpenSrc.style.display   = 'none';
     return;
@@ -5286,19 +5367,23 @@ async function initOriginalPreview() {
   }
 
   // Résoudre l'URL PDF à afficher : source native ou PDF de référence
-  const pdfUrl = (!State.sourceIsText && State.sourceBlobUrl)
-    ? State.sourceBlobUrl
-    : State.refDocUrl;
+  const isSourcePdf = !State.sourceIsText && !!State.sourceBlobUrl;
+  const pdfUrl = isSourcePdf ? State.sourceBlobUrl : State.refDocUrl;
 
   if (pdfUrl) {
     // PDF natif OU PDF de référence chargé a posteriori
     if (pdfIframe) { pdfIframe.src = pdfUrl; pdfIframe.style.display = 'block'; syncPdfToolbarSpacer(); }
     _hideOriginalViewer();
     if (placeholder) placeholder.style.display = 'none';
+    // Surlignage direct sur le document : uniquement pour le VRAI document
+    // analysé (pas un PDF de référence chargé a posteriori, sans rapport
+    // avec les entités détectées).
+    if (isSourcePdf) _buildPdfOverlay(pdfUrl); else _hidePdfOverlay();
   } else if (State._docxFile && typeof mammoth !== 'undefined') {
     // DOCX : rendu HTML via Mammoth dans le panneau gauche du split
     if (pdfIframe) { pdfIframe.style.display = 'none'; pdfIframe.src = ''; }
     _hideOriginalViewer();
+    _hidePdfOverlay();
     if (splitDocxDiv) splitDocxDiv.style.display = 'block';
     if (placeholder) placeholder.style.display = 'none';
     const spacer = document.getElementById('pdfToolbarSpacer');
@@ -5314,6 +5399,7 @@ async function initOriginalPreview() {
   } else if (State.rawText) {
     // TXT sans PDF de référence : afficher le texte source numéroté
     if (pdfIframe) { pdfIframe.style.display = 'none'; pdfIframe.src = ''; }
+    _hidePdfOverlay();
     _fillOriginalViewer(State.rawText);
     if (placeholder) placeholder.style.display = 'none';
     const spacer = document.getElementById('pdfToolbarSpacer');
@@ -6019,6 +6105,10 @@ function refreshEntityViewer() {
   ViewerState.mode = prevMode;
   // Ajouter les listeners après le rebuild DOM (setTimeout garantit que innerHTML est fini)
   setTimeout(() => addEntityClickListeners(), 0);
+  // Redessiner le surlignage sur le document original si l'overlay est actif
+  if (typeof PdfOverlay !== 'undefined' && PdfOverlay.isReady()) {
+    PdfOverlay.highlight(State.entities);
+  }
 }
 
 /**
