@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=7">
+<link rel="stylesheet" href="css/style.css?v=8">
 <script>
   // Theme bootstrap — read before paint to avoid FOUC
   (function(){
@@ -1366,17 +1366,17 @@
 </div>
 
 <script src="js/jszip.min.js"></script>
-<script src="js/dict_fr.js?v=7"></script>
-<script src="js/storage.js?v=7"></script>
-<script src="js/ocr.js?v=7"></script>
-<script src="js/analysis.js?v=7"></script>
-<script src="js/identity-resolver.js?v=7"></script>
-<script src="js/anonymize.js?v=7"></script>
-<script src="js/server.js?v=7"></script>
-<script src="js/ocrCleaner.js?v=7"></script>
+<script src="js/dict_fr.js?v=8"></script>
+<script src="js/storage.js?v=8"></script>
+<script src="js/ocr.js?v=8"></script>
+<script src="js/analysis.js?v=8"></script>
+<script src="js/identity-resolver.js?v=8"></script>
+<script src="js/anonymize.js?v=8"></script>
+<script src="js/server.js?v=8"></script>
+<script src="js/ocrCleaner.js?v=8"></script>
 <script src="js/vendor/pdfjs/pdf.min.js"></script>
-<script src="js/pdf-overlay.js?v=7"></script>
-<script src="js/app.js?v=7"></script>
+<script src="js/pdf-overlay.js?v=8"></script>
+<script src="js/app.js?v=8"></script>
 <script src="js/mammoth.min.js"></script>
 
 
@@ -1475,7 +1475,22 @@
 <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
 <script>
   (function(){
-    function renderIcons(){ if (window.lucide && lucide.createIcons) lucide.createIcons(); }
+    // Lucide remplace chaque <i data-lucide="…"> par un <svg> qui CONSERVE
+    // l'attribut data-lucide. Si l'observer ci-dessous réagissait à
+    // n'importe quel nœud [data-lucide] (svg compris), le <svg> généré par
+    // renderIcons() redéclenchait lui-même l'observer → nouveau <svg> →
+    // nouvelle mutation → boucle infinie (CPU à 100%, page figée, aucune
+    // erreur console — confirmé par une trace de perf utilisateur montrant
+    // des milliers d'appels à ce callback). On ne réagit donc qu'aux
+    // placeholders <i data-lucide> non encore convertis, jamais aux <svg>
+    // déjà produits par Lucide ; un verrou de ré-entrance protège en plus
+    // d'un éventuel appel concurrent.
+    var rendering = false;
+    function renderIcons(){
+      if (rendering || !window.lucide || !lucide.createIcons) return;
+      rendering = true;
+      try { lucide.createIcons(); } finally { rendering = false; }
+    }
     // Initial render
     if (document.readyState !== 'loading') renderIcons();
     else document.addEventListener('DOMContentLoaded', renderIcons);
@@ -1487,7 +1502,7 @@
         var m = muts[i];
         for (var j=0;j<m.addedNodes.length;j++){
           var n = m.addedNodes[j];
-          if (n.nodeType === 1 && (n.querySelector?.('[data-lucide]') || n.matches?.('[data-lucide]'))) { needs = true; break; }
+          if (n.nodeType === 1 && (n.querySelector?.('i[data-lucide]') || n.matches?.('i[data-lucide]'))) { needs = true; break; }
         }
         if (needs) break;
       }
