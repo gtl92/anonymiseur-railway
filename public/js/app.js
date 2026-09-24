@@ -5316,9 +5316,13 @@ async function _buildRightPdfOverlay() {
     if (loading) loading.classList.remove('active');
     _showRightPdfToolbar(false);
     const isDocx = !!State._docxFile;
+    const srcExt = (State.sourceFileName || '').split('.').pop().toLowerCase();
+    const wasPdf = !isDocx && srcExt === 'pdf';
     const docTypeMsg = isDocx
       ? 'Ce document est un fichier Word (.docx)'
-      : 'Ce document est un fichier texte';
+      : wasPdf
+        ? 'Le PDF d\'origine n\'est plus disponible (perdu après un rechargement de page ou une reprise de session)'
+        : 'Ce document est un fichier texte';
     if (State.refDocUrl) {
       wrap.innerHTML = `<iframe class="split-pdf" style="width:100%;height:100%;border:0" src="${State.refDocUrl}" title="PDF de référence"></iframe>`;
     } else {
@@ -5326,7 +5330,7 @@ async function _buildRightPdfOverlay() {
         ${docTypeMsg} : le surlignage des entités directement sur le document original n'est
         disponible que pour les PDF. Utilisez la vue <strong>Texte</strong> pour voir les entités surlignées.
         <br><button class="btn-sm btn-outline" onclick="triggerLoadRefPdf()" style="margin-top:8px">
-          <i data-lucide="paperclip"></i> Charger un PDF de référence (sans surlignage)
+          <i data-lucide="paperclip"></i> ${wasPdf ? 'Recharger le PDF' : 'Charger un PDF de référence'} (sans surlignage)
         </button>
       </div>`;
       if (typeof lucide !== 'undefined') lucide.createIcons();
