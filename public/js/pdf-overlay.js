@@ -94,7 +94,22 @@ function candidateTokenLists(entity) {
     .filter(toks => toks.length > 0);
 }
 
-/** Rectangles fusionnés (fractions de page) des occurrences d'une entité sur une page. */
+function rectFromWords(words) {
+  const left   = Math.min(...words.map(w => w.left));
+  const top    = Math.min(...words.map(w => w.top));
+  const right  = Math.max(...words.map(w => w.left + w.width));
+  const bottom = Math.max(...words.map(w => w.top + w.height));
+  return { left, top, width: right - left, height: bottom - top };
+}
+
+/**
+ * Rectangles (fractions de page) des occurrences d'une entité sur une page.
+ * Un match multi-mots (ex. "Monsieur SCHNEIDER") peut enjamber un saut de
+ * ligne pdfjs — fusionner bêtement min/max produirait alors une boîte
+ * couvrant toute la zone verticale entre les deux lignes. On découpe donc le
+ * span en groupes de mots sur la même ligne (écart vertical < 60% de la
+ * hauteur du mot précédent) et on émet un rectangle par groupe.
+ */
 function matchesForPage(pageWords, entity) {
   const pageTokens = pageWords.map(w => foldTok(w.text));
   const rects = [];
@@ -106,11 +121,18 @@ function matchesForPage(pageWords, entity) {
       }
       if (!ok) continue;
       const span = pageWords.slice(i, i + cand.length);
-      const left   = Math.min(...span.map(w => w.left));
-      const top    = Math.min(...span.map(w => w.top));
-      const right  = Math.max(...span.map(w => w.left + w.width));
-      const bottom = Math.max(...span.map(w => w.top + w.height));
-      rects.push({ left, top, width: right - left, height: bottom - top });
+      let group = [span[0]];
+      for (let k = 1; k < span.length; k++) {
+        const prev = span[k - 1], cur = span[k];
+        const sameLine = Math.abs(cur.top - prev.top) < prev.height * 0.6;
+        if (sameLine) {
+          group.push(cur);
+        } else {
+          rects.push(rectFromWords(group));
+          group = [cur];
+        }
+      }
+      rects.push(rectFromWords(group));
     }
   }
   return rects;
@@ -130,6 +152,11 @@ function createPdfOverlay() {
   let _pages        = [];  // [{ el, words: [{text,left,top,width,height}] (fractions 0..1) }]
   let _container    = null;
   let _lastEntities = null; // pour redessiner une fois les images OCR chargées (async)
+  // Jeton de build : si un second appel à loadNative/loadOcr démarre avant
+  // que le premier ait fini (ex. double clic sur l'onglet "Original" pendant
+  // le rendu d'un gros PDF), l'appel périmé doit s'arrêter au lieu de
+  // continuer à ajouter des pages dans le désordre au conteneur.
+  let _buildId = 0;
 
   function clear() {
     _pages = [];
@@ -144,6 +171,7 @@ function createPdfOverlay() {
    * serveur pour ce chemin.
    */
   async function loadNative(blobUrl, container) {
+    const myBuild = ++_buildId;
     clear();
     _container = container;
     if (!ensurePdfjs() || !blobUrl) return false;
@@ -155,8 +183,11 @@ function createPdfOverlay() {
       console.error('[PdfOverlay] échec chargement pdfjs, repli sur l\'iframe brute :', err);
       return false;
     }
+    if (myBuild !== _buildId) return false; // supersédé pendant le chargement du document
 
     for (let n = 1; n <= doc.numPages; n++) {
+      if (myBuild !== _buildId) return false; // un appel plus récent a pris le relais
+
       const page     = await doc.getPage(n);
       const viewport = page.getViewport({ scale: 1.5 });
 
@@ -168,10 +199,13 @@ function createPdfOverlay() {
       canvas.height = viewport.height;
       const ctx = canvas.getContext('2d');
       await page.render({ canvasContext: ctx, viewport }).promise;
+      if (myBuild !== _buildId) return false;
+
       pageEl.appendChild(canvas);
       container.appendChild(pageEl);
 
       const words = await nativePageWords(page, viewport);
+      if (myBuild !== _buildId) return false;
       _pages.push({ el: pageEl, words });
     }
     return true;
@@ -183,6 +217,7 @@ function createPdfOverlay() {
    * renvoyées par server.js — cf. extractPdfOcr).
    */
   function loadOcr(pageImages, pageBoxes, container) {
+    const myBuild = ++_buildId;
     clear();
     _container = container;
     if (!pageImages || !pageImages.length) return false;
@@ -200,6 +235,7 @@ function createPdfOverlay() {
       const boxes = (pageBoxes && pageBoxes[i] && pageBoxes[i].words) || [];
       const words = [];
       img.addEventListener('load', () => {
+        if (myBuild !== _buildId) return; // supersédé par un appel plus récent
         const nw = img.naturalWidth  || 1;
         const nh = img.naturalHeight || 1;
         for (const b of boxes) {
