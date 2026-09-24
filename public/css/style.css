@@ -1180,6 +1180,7 @@ body.settings-open { overflow: hidden; }
   display: flex; flex-direction: column;
   background: var(--bg-2);
   min-width: 200px;
+  position: relative; /* ancre .pdfov-loading en overlay plein panneau */
 }
 .ocr-split-left { border-right: 0; }
 .ocr-split-right { background: var(--bg-2); }
@@ -1265,6 +1266,31 @@ body.settings-open { overflow: hidden; }
   border-radius: 2px;
   cursor: help;
 }
+
+/* Spinner affiché pendant le rendu initial du PDF (loadNative/loadOcr,
+   page par page — peut prendre quelques secondes sur un document long). */
+.pdfov-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--bg-2);
+  color: var(--fg-3);
+  font-size: var(--text-sm);
+}
+.pdfov-loading.active { display: flex; }
+.pdfov-spinner {
+  width: 28px; height: 28px;
+  border: 3px solid var(--border-default);
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: pdfov-spin 0.8s linear infinite;
+}
+@keyframes pdfov-spin { to { transform: rotate(360deg); } }
 
 /* Placeholder col gauche */
 .split-placeholder {
