@@ -108,21 +108,47 @@ function rectFromWords(words) {
 }
 
 /**
+ * Index d'une page — calculé UNE FOIS par page (pas par entité) : les tokens
+ * repliés de chaque mot, et la liste des positions où chaque token apparaît.
+ * Sans cet index, matchesForPage recalculait pageTokens et scannait tous les
+ * mots pour CHAQUE entité — sur un document long avec beaucoup d'entités
+ * (typiquement après reprise d'une session déjà bien avancée), le coût
+ * explosait (pages × mots × entités) et gelait l'onglet le temps du calcul.
+ */
+function buildPageWordIndex(pageWords) {
+  const tokens = pageWords.map(w => foldTok(w.text));
+  const byFirstToken = new Map(); // token replié → [indices de mots qui commencent ainsi]
+  tokens.forEach((tok, i) => {
+    if (!tok) return;
+    let arr = byFirstToken.get(tok);
+    if (!arr) { arr = []; byFirstToken.set(tok, arr); }
+    arr.push(i);
+  });
+  return { tokens, byFirstToken };
+}
+
+/**
  * Rectangles (fractions de page) des occurrences d'une entité sur une page.
  * Un match multi-mots (ex. "Monsieur SCHNEIDER") peut enjamber un saut de
  * ligne pdfjs — fusionner bêtement min/max produirait alors une boîte
  * couvrant toute la zone verticale entre les deux lignes. On découpe donc le
  * span en groupes de mots sur la même ligne (écart vertical < 60% de la
  * hauteur du mot précédent) et on émet un rectangle par groupe.
+ *
+ * `pageIndex` (buildPageWordIndex) permet de ne partir que des positions du
+ * premier token du candidat, au lieu de scanner tous les mots de la page.
  */
-function matchesForPage(pageWords, entity) {
-  const pageTokens = pageWords.map(w => foldTok(w.text));
+function matchesForPage(pageWords, pageIndex, entity) {
+  const { tokens, byFirstToken } = pageIndex;
   const rects = [];
   for (const cand of candidateTokenLists(entity)) {
-    for (let i = 0; i <= pageTokens.length - cand.length; i++) {
+    const starts = byFirstToken.get(cand[0]);
+    if (!starts) continue;
+    for (const i of starts) {
+      if (i + cand.length > tokens.length) continue;
       let ok = true;
-      for (let j = 0; j < cand.length; j++) {
-        if (pageTokens[i + j] !== cand[j]) { ok = false; break; }
+      for (let j = 1; j < cand.length; j++) {
+        if (tokens[i + j] !== cand[j]) { ok = false; break; }
       }
       if (!ok) continue;
       const span = pageWords.slice(i, i + cand.length);
@@ -323,8 +349,16 @@ function createPdfOverlay() {
     for (const page of _pages) {
       page.el.querySelectorAll('.pdfov-hl').forEach(n => n.remove());
       if (!page.words.length) continue;
+      // Index recalculé seulement si les mots de la page ont changé (ex.
+      // page OCR dont le chargement se termine après un 1er appel) —
+      // sinon réutilisé tel quel, highlight() pouvant être appelé souvent
+      // (édition d'entités, zoom, changement d'onglet…).
+      if (page._wordIndexFor !== page.words) {
+        page._wordIndex    = buildPageWordIndex(page.words);
+        page._wordIndexFor = page.words;
+      }
       for (const entity of active) {
-        for (const rect of matchesForPage(page.words, entity)) {
+        for (const rect of matchesForPage(page.words, page._wordIndex, entity)) {
           const box = document.createElement('div');
           box.className = `pdfov-hl ${typeClass(entity.type)}`;
           box.style.left   = (rect.left   * 100) + '%';
