@@ -5246,7 +5246,7 @@ async function _buildPdfOverlay(pdfUrl) {
   let ok = false;
   if (State.pageImages && State.pageImages.length) {
     // PDF scanné (OCR) : images + positions par mot déjà fournies par le serveur.
-    ok = PdfOverlayLeft.loadOcr(State.pageImages, State.pageBoxes, wrap);
+    ok = await PdfOverlayLeft.loadOcr(State.pageImages, State.pageBoxes, wrap);
   } else {
     // PDF texte natif : rendu et positionnement 100% navigateur (pdfjs).
     ok = await PdfOverlayLeft.loadNative(pdfUrl, wrap);
@@ -5274,6 +5274,24 @@ function _hidePdfOverlay() {
 // #rightPdfWrap dans #ocrSplitRight, activé par le toggle Texte/Original.
 let _rightPdfOverlayBuiltFor = null;
 
+let _rightPdfCurrentPage = 1;
+
+function _showRightPdfToolbar(show) {
+  const tb = document.getElementById('rightPdfToolbar');
+  if (tb) tb.style.display = show ? 'flex' : 'none';
+}
+
+function _updateRightPdfToolbar() {
+  if (!PdfOverlayRight) return;
+  const count = PdfOverlayRight.pageCount();
+  const numEl   = document.getElementById('rightPdfPageNum');
+  const countEl = document.getElementById('rightPdfPageCount');
+  const zoomEl  = document.getElementById('rightPdfZoomLabel');
+  if (numEl)   numEl.textContent   = Math.min(_rightPdfCurrentPage, count || 1);
+  if (countEl) countEl.textContent = count;
+  if (zoomEl)  zoomEl.textContent  = Math.round(PdfOverlayRight.getZoom() * 100) + ' %';
+}
+
 async function _buildRightPdfOverlay() {
   const wrap = document.getElementById('rightPdfWrap');
   if (!wrap || !PdfOverlayRight) return;
@@ -5282,7 +5300,9 @@ async function _buildRightPdfOverlay() {
   if (!isSourcePdf) {
     // Pas de PDF source (TXT, ou blob perdu après un rechargement de page) :
     // repli sur un PDF de référence chargé manuellement, sans surlignage
-    // (ce n'est pas le document analysé — cf. triggerLoadRefPdf).
+    // (ce n'est pas le document analysé — cf. triggerLoadRefPdf). Pas de
+    // barre de pages/zoom ici : c'est le lecteur PDF natif du navigateur.
+    _showRightPdfToolbar(false);
     if (State.refDocUrl) {
       wrap.innerHTML = `<iframe class="split-pdf" style="width:100%;height:100%;border:0" src="${State.refDocUrl}" title="PDF de référence"></iframe>`;
     } else {
@@ -5300,23 +5320,50 @@ async function _buildRightPdfOverlay() {
 
   if (_rightPdfOverlayBuiltFor === pdfUrl && PdfOverlayRight.isReady()) {
     PdfOverlayRight.highlight(State.entities);
+    _showRightPdfToolbar(true);
+    _updateRightPdfToolbar();
     return;
   }
 
   let ok = false;
   if (State.pageImages && State.pageImages.length) {
-    ok = PdfOverlayRight.loadOcr(State.pageImages, State.pageBoxes, wrap);
+    ok = await PdfOverlayRight.loadOcr(State.pageImages, State.pageBoxes, wrap);
   } else {
     ok = await PdfOverlayRight.loadNative(pdfUrl, wrap);
   }
 
   if (ok) {
     _rightPdfOverlayBuiltFor = pdfUrl;
+    _rightPdfCurrentPage = 1;
+    PdfOverlayRight.fitZoom();
     PdfOverlayRight.highlight(State.entities);
+    _showRightPdfToolbar(true);
+    _updateRightPdfToolbar();
   } else {
     _rightPdfOverlayBuiltFor = null;
+    _showRightPdfToolbar(false);
     wrap.innerHTML = '<div class="pdfov-empty">Aperçu du document original indisponible.</div>';
   }
+}
+
+function zoomRightPdf(delta) {
+  if (!PdfOverlayRight || !PdfOverlayRight.isReady()) return;
+  PdfOverlayRight.setZoom(PdfOverlayRight.getZoom() + delta);
+  _updateRightPdfToolbar();
+}
+
+function fitRightPdf() {
+  if (!PdfOverlayRight || !PdfOverlayRight.isReady()) return;
+  PdfOverlayRight.fitZoom();
+  _updateRightPdfToolbar();
+}
+
+function navRightPdfPage(delta) {
+  if (!PdfOverlayRight || !PdfOverlayRight.isReady()) return;
+  const count = PdfOverlayRight.pageCount();
+  _rightPdfCurrentPage = Math.max(1, Math.min(count, _rightPdfCurrentPage + delta));
+  PdfOverlayRight.scrollToPage(_rightPdfCurrentPage);
+  _updateRightPdfToolbar();
 }
 
 /**
@@ -5339,6 +5386,7 @@ function setRightPanelView(view) {
   } else {
     if (viewerWrap) viewerWrap.style.display = 'flex';
     if (pdfWrap)    pdfWrap.style.display = 'none';
+    _showRightPdfToolbar(false);
   }
 }
 
