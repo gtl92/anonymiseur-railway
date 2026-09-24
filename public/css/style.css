@@ -84,7 +84,7 @@ code, .mono { font-family: var(--font-mono); }
   --fg-3:             #7A88AE;   /* tertiary, captions */
   --fg-4:             #4C5778;   /* muted, dividers when used as text */
   --fg-brand:         #4FBEFF;
-  --fg-on-brand:      #051124;
+  --fg-on-brand:      #FFFFFF;
   --fg-on-dark:       #ECF1FA;
 
   /* Borders */
