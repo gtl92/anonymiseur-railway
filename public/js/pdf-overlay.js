@@ -55,9 +55,14 @@ async function nativePageWords(page, viewport) {
   for (const item of content.items) {
     if (!item.str || !item.str.trim()) continue;
     const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
-    const scaleX    = Math.hypot(tx[0], tx[1]);
     const fontHeight = Math.hypot(tx[2], tx[3]);
-    const widthPx    = item.width * scaleX;
+    // item.width est déjà exprimé par pdfjs à l'échelle "police normale"
+    // (avance du glyphe × taille de police) — le multiplier par tx[0]/tx[1]
+    // (qui inclut LUI AUSSI la taille de police via la matrice de l'item)
+    // comptait la taille de police deux fois et gonflait la largeur d'un
+    // facteur ≈ la taille de police (un mot de 10 caractères débordait sur
+    // toute la largeur de page). Seule l'échelle du viewport doit s'appliquer.
+    const widthPx = item.width * viewport.scale;
     const x = tx[4];
     // tx[5] = position de la LIGNE DE BASE (bas du texte, hors jambages) en
     // pixels viewport. L'ascendant réel couvre ~80% de la hauteur de fonte
@@ -128,11 +133,11 @@ function matchesForPage(pageWords, entity) {
         if (sameLine) {
           group.push(cur);
         } else {
-          rects.push({ rect: rectFromWords(group), words: group });
+          rects.push(rectFromWords(group));
           group = [cur];
         }
       }
-      rects.push({ rect: rectFromWords(group), words: group });
+      rects.push(rectFromWords(group));
     }
   }
   return rects;
@@ -264,13 +269,12 @@ function createPdfOverlay() {
     _lastEntities = entities;
     if (!_pages.length) return;
     const active = (entities || []).filter(e => e && e.active && !e.blocked && e.value);
-    let debugLeft = 12; // limite le bruit console — juste de quoi diagnostiquer
 
     for (const page of _pages) {
       page.el.querySelectorAll('.pdfov-hl').forEach(n => n.remove());
       if (!page.words.length) continue;
       for (const entity of active) {
-        for (const { rect, words } of matchesForPage(page.words, entity)) {
+        for (const rect of matchesForPage(page.words, entity)) {
           const box = document.createElement('div');
           box.className = `pdfov-hl ${typeClass(entity.type)}`;
           box.style.left   = (rect.left   * 100) + '%';
@@ -279,16 +283,6 @@ function createPdfOverlay() {
           box.style.height = (rect.height * 100) + '%';
           box.title = entity.value;
           page.el.appendChild(box);
-          if (debugLeft > 0 && rect.width > 0.25) {
-            debugLeft--;
-            console.log('[PdfOverlay] boîte large —', {
-              entite: entity.value,
-              aliases: entity.aliases,
-              motsGroupes: words.map(w => w.text),
-              nbMotsGroupe: words.length,
-              rectFraction: rect,
-            });
-          }
         }
       }
     }
