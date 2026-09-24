@@ -263,6 +263,18 @@ function switchLeftPanel(step) {
   if (step2Actions) step2Actions.style.display = 'none';
   if (step3Actions) step3Actions.style.display = 'none';
 
+  // Avertir avant le clic : le surlignage sur le document original n'existe
+  // que pour le PDF — pas pour un DOCX/TXT importé.
+  if (isStep3) {
+    const btnOriginal = document.getElementById('rvtBtnOriginal');
+    if (btnOriginal) {
+      const isSourcePdf = !State.sourceIsText && !!State.sourceBlobUrl;
+      btnOriginal.title = isSourcePdf
+        ? ''
+        : 'Surlignage des entités indisponible pour ce type de document (Word/texte) — voir la vue Texte';
+    }
+  }
+
   // Toggle anonymisé — visible seulement en step 3
   const anonToggle = document.getElementById('anonPreviewToggle');
   if (anonToggle) {
@@ -5215,8 +5227,9 @@ function switchViewerTab(tab) {
 let _pdfOverlayBuiltFor = null;
 
 async function _buildPdfOverlay(pdfUrl) {
-  const wrap   = document.getElementById('pdfOverlayWrap');
-  const iframe = document.getElementById('pdfPreview');
+  const wrap    = document.getElementById('pdfOverlayWrap');
+  const iframe  = document.getElementById('pdfPreview');
+  const loading = document.getElementById('pdfOverlayLoading');
   if (!wrap || !PdfOverlayLeft) return;
 
   if (_pdfOverlayBuiltFor === pdfUrl && PdfOverlayLeft.isReady()) {
@@ -5226,13 +5239,21 @@ async function _buildPdfOverlay(pdfUrl) {
     return;
   }
 
+  // Rendu page par page (coûteux sur un document long) : spinner le temps
+  // que le premier affichage se fasse — les rechargements suivants du même
+  // document réutilisent le cache ci-dessus et ne passent pas par ici.
+  if (loading) loading.classList.add('active');
   let ok = false;
-  if (State.pageImages && State.pageImages.length) {
-    // PDF scanné (OCR) : images + positions par mot déjà fournies par le serveur.
-    ok = await PdfOverlayLeft.loadOcr(State.pageImages, State.pageBoxes, wrap);
-  } else {
-    // PDF texte natif : rendu et positionnement 100% navigateur (pdfjs).
-    ok = await PdfOverlayLeft.loadNative(pdfUrl, wrap);
+  try {
+    if (State.pageImages && State.pageImages.length) {
+      // PDF scanné (OCR) : images + positions par mot déjà fournies par le serveur.
+      ok = await PdfOverlayLeft.loadOcr(State.pageImages, State.pageBoxes, wrap);
+    } else {
+      // PDF texte natif : rendu et positionnement 100% navigateur (pdfjs).
+      ok = await PdfOverlayLeft.loadNative(pdfUrl, wrap);
+    }
+  } finally {
+    if (loading) loading.classList.remove('active');
   }
 
   if (ok) {
@@ -5276,23 +5297,33 @@ function _updateRightPdfToolbar() {
 }
 
 async function _buildRightPdfOverlay() {
-  const wrap = document.getElementById('rightPdfWrap');
+  const wrap    = document.getElementById('rightPdfWrap');
+  const loading = document.getElementById('rightPdfLoading');
   if (!wrap || !PdfOverlayRight) return;
 
   const isSourcePdf = !State.sourceIsText && !!State.sourceBlobUrl;
   if (!isSourcePdf) {
-    // Pas de PDF source (TXT, ou blob perdu après un rechargement de page) :
-    // repli sur un PDF de référence chargé manuellement, sans surlignage
-    // (ce n'est pas le document analysé — cf. triggerLoadRefPdf). Pas de
-    // barre de pages/zoom ici : c'est le lecteur PDF natif du navigateur.
+    // Pas de PDF source (DOCX, TXT, ou blob perdu après un rechargement de
+    // page) : le surlignage des entités sur le document n'existe que pour
+    // le PDF (rendu pdfjs + positions par mot) — pas de repli possible sur
+    // un DOCX/TXT. Repli sur un PDF de référence chargé manuellement le cas
+    // échéant, sans surlignage (ce n'est pas le document analysé — cf.
+    // triggerLoadRefPdf). Pas de barre de pages/zoom ici : c'est le lecteur
+    // PDF natif du navigateur.
+    if (loading) loading.classList.remove('active');
     _showRightPdfToolbar(false);
+    const isDocx = !!State._docxFile;
+    const docTypeMsg = isDocx
+      ? 'Ce document est un fichier Word (.docx)'
+      : 'Ce document est un fichier texte';
     if (State.refDocUrl) {
       wrap.innerHTML = `<iframe class="split-pdf" style="width:100%;height:100%;border:0" src="${State.refDocUrl}" title="PDF de référence"></iframe>`;
     } else {
       wrap.innerHTML = `<div class="pdfov-empty">
-        Aucun PDF source disponible pour cette vue (document texte, ou fichier PDF perdu après un rechargement de page).
+        ${docTypeMsg} : le surlignage des entités directement sur le document original n'est
+        disponible que pour les PDF. Utilisez la vue <strong>Texte</strong> pour voir les entités surlignées.
         <br><button class="btn-sm btn-outline" onclick="triggerLoadRefPdf()" style="margin-top:8px">
-          <i data-lucide="paperclip"></i> Charger un PDF de référence
+          <i data-lucide="paperclip"></i> Charger un PDF de référence (sans surlignage)
         </button>
       </div>`;
       if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -5308,11 +5339,18 @@ async function _buildRightPdfOverlay() {
     return;
   }
 
+  // Rendu page par page (coûteux sur un document long) : spinner le temps
+  // que le premier affichage se fasse.
+  if (loading) loading.classList.add('active');
   let ok = false;
-  if (State.pageImages && State.pageImages.length) {
-    ok = await PdfOverlayRight.loadOcr(State.pageImages, State.pageBoxes, wrap);
-  } else {
-    ok = await PdfOverlayRight.loadNative(pdfUrl, wrap);
+  try {
+    if (State.pageImages && State.pageImages.length) {
+      ok = await PdfOverlayRight.loadOcr(State.pageImages, State.pageBoxes, wrap);
+    } else {
+      ok = await PdfOverlayRight.loadNative(pdfUrl, wrap);
+    }
+  } finally {
+    if (loading) loading.classList.remove('active');
   }
 
   if (ok) {

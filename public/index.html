@@ -487,6 +487,10 @@
                    Remplace l'iframe brute quand disponible ; repli automatique
                    sur l'iframe sinon (DOCX/TXT référencé, échec de rendu). -->
               <div id="pdfOverlayWrap" class="pdfov-wrap" style="display:none"></div>
+              <div id="pdfOverlayLoading" class="pdfov-loading">
+                <div class="pdfov-spinner"></div>
+                <span>Préparation de l'aperçu…</span>
+              </div>
               <iframe id="pdfPreview" class="split-pdf" style="display:none" title="PDF original"></iframe>
               <div id="splitDocxPreview" class="split-docx-viewer" style="display:none"></div>
               <div class="viewer-wrap" id="origViewerWrap" style="display:none; flex:1; min-height:0">
@@ -757,6 +761,10 @@
             </div>
             <!-- Document original avec entités surlignées dessus (onglet "Original", step 3) -->
             <div id="rightPdfWrap" class="pdfov-wrap" style="display:none"></div>
+            <div id="rightPdfLoading" class="pdfov-loading">
+              <div class="pdfov-spinner"></div>
+              <span>Préparation de l'aperçu…</span>
+            </div>
             <div class="viewer-footer">
               <span id="viewerStats" class="viewer-stats"></span>
             </div>
