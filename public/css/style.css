@@ -1258,10 +1258,9 @@ body.settings-open { overflow: hidden; }
 }
 .pdfov-hl {
   position: absolute;
-  background: var(--brand-100);
-  border: 1px solid var(--brand);
+  background: rgba(124, 58, 237, 0.28); /* --brand à 28% — --brand-100 (13%) était trop pâle une fois combiné à opacity */
+  border: 1.5px solid var(--brand);
   border-radius: 2px;
-  opacity: 0.55;
   cursor: help;
 }
 
@@ -1384,6 +1383,42 @@ body.settings-open { overflow: hidden; }
 }
 .open-pdf-group button:hover { background: var(--bg-4); color: var(--fg-1); }
 .open-pdf-sep { height: 1px; background: var(--border-subtle); margin: 4px 0; }
+
+/* Bascule Texte / Original du panneau droit (step 3) */
+.right-view-toggle {
+  display: inline-flex;
+  background: var(--bg-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  padding: 2px;
+  gap: 2px;
+}
+.rvt-btn {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--fg-2);
+  cursor: pointer;
+}
+.rvt-btn.active {
+  background: var(--brand);
+  color: var(--fg-on-brand);
+}
+.pdfov-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  color: var(--fg-3);
+  font-size: 13px;
+  line-height: 1.6;
+}
 
 /* Anon preview toggle */
 .anon-preview-toggle {
