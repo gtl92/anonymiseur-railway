@@ -28,6 +28,13 @@ const State = {
   },
 };
 
+// Instances de surlignage direct sur le document — une par emplacement
+// d'affichage (panneau gauche step 2, panneau droit step 3), pour ne pas
+// qu'une instance efface le rendu de l'autre en se rechargeant.
+const PdfOverlayLeft  = typeof createPdfOverlay === 'function' ? createPdfOverlay() : null;
+const PdfOverlayRight = typeof createPdfOverlay === 'function' ? createPdfOverlay() : null;
+let _rightPanelView = 'texte'; // 'texte' | 'original' — step 3 uniquement
+
 // Types système (toujours présents)
 const SYSTEM_TYPES = [
   { id: 'NOM',     label: 'Nom & Prénom' },
@@ -236,7 +243,9 @@ function goToStep(n) {
 }
 
 // Vue courante du panneau gauche en step 3 : 'pdf' | 'entities'
-let _leftPanelView = 'pdf';
+// step 3 : le panneau gauche affiche désormais toujours les entités — le
+// bascule PDF/Texte a migré dans le panneau droit (cf. setRightPanelView).
+let _leftPanelView = 'entities';
 
 /**
  * Bascule la colonne gauche entre PDF (step 2) et vue step 3.
@@ -253,6 +262,7 @@ function switchLeftPanel(step) {
   const step2Actions = document.getElementById('step2Actions');
   const step3Actions = document.getElementById('step3Actions');
   const spacer      = document.getElementById('pdfToolbarSpacer');
+  const rightToggle = document.getElementById('rightViewToggle');
 
   const isStep2 = step === 2;
   const isStep3 = step === 3;
@@ -261,6 +271,7 @@ function switchLeftPanel(step) {
   if (headerEnt)    headerEnt.style.display    = isStep3 ? 'flex' : 'none';
   if (viewerHint)   viewerHint.style.display   = isStep2 ? 'flex' : 'none';
   if (step3Header)  step3Header.style.display  = isStep3 ? 'flex' : 'none';
+  if (rightToggle)  rightToggle.style.display  = isStep3 ? 'flex' : 'none';
   if (step2Actions) step2Actions.style.display = 'none';
   if (step3Actions) step3Actions.style.display = 'none';
 
@@ -285,11 +296,13 @@ function switchLeftPanel(step) {
     _showPdfPanel();
     if (spacer) spacer.style.display = 'block';
   } else if (isStep3) {
-    // Step 3 : restaurer la vue précédente (PDF ou entités)
+    // Step 3 : panneau gauche toujours sur les entités (sauf oublis en cours)
     setLeftPanelView(_leftPanelView, false);
-    if (spacer) spacer.style.display = _leftPanelView === 'pdf' ? 'block' : 'none';
+    if (spacer) spacer.style.display = 'none';
     // Mettre à jour le label selon le type de source
     setTimeout(_updateLeftPanelLabel, 0);
+    // Panneau droit : restaure le dernier onglet choisi (Texte par défaut)
+    setRightPanelView(_rightPanelView);
   }
 }
 
@@ -502,13 +515,14 @@ const acceptTypes = '.pdf,.docx,.doc';
     });
 
     if (openInNew) {
-      // Ne pas toucher au panneau gauche
       window.open(State.refDocUrl, '_blank');
+    } else if (State.currentStep === 3) {
+      // Remplacer : afficher dans l'onglet "Original" du panneau droit
+      _rightPdfOverlayBuiltFor = null; // forcer le rebuild (nouvelle réf.)
+      setRightPanelView('original');
     } else {
-      // Remplacer : afficher dans le panneau gauche
-      setLeftPanelView('pdf');
+      // Step 2 : afficher dans le panneau gauche (comparaison original/corrigé)
       _showRefInPanel(isHtml ? htmlContent : State.refDocUrl, isHtml);
-      _updateLeftPanelLabel();
       syncPdfToolbarSpacer();
       _hideOriginalViewer();
       const noDoc = document.getElementById('splitNoDoc');
@@ -599,7 +613,11 @@ async function loadFile(file) {
   if (State.sourceBlobUrl) { URL.revokeObjectURL(State.sourceBlobUrl); State.sourceBlobUrl = null; }
   State.pageBoxes  = null;
   State.pageImages = null;
-  if (typeof PdfOverlay !== 'undefined') PdfOverlay.clear();
+  if (PdfOverlayLeft)  PdfOverlayLeft.clear();
+  if (PdfOverlayRight) PdfOverlayRight.clear();
+  _pdfOverlayBuiltFor = null;
+  _rightPdfOverlayBuiltFor = null;
+  _rightPanelView = 'texte';
 
   let text = '', method = 'txt';
 
@@ -5204,43 +5222,43 @@ function switchViewerTab(tab) {
   }
 }
 
-// ── Surlignage des entités directement sur le rendu du PDF (step 2/3) ───────
-// PdfOverlay.loadNative/loadOcr est coûteux (rend chaque page) : on ne le
-// relance que si l'URL source a changé, sinon on se contente de redessiner
-// les surlignages (highlight() est bon marché).
+// ── Surlignage des entités directement sur le rendu du PDF ──────────────────
+// loadNative/loadOcr est coûteux (rend chaque page) : on ne le relance que si
+// l'URL source (ou l'emplacement d'affichage) a changé, sinon on se contente
+// de redessiner les surlignages (highlight() est bon marché).
+//
+// Panneau GAUCHE (step 2 uniquement, comparaison original/corrigé) —
+// PdfOverlayLeft, conteneur #pdfOverlayWrap dans #leftPdfPanel.
 let _pdfOverlayBuiltFor = null;
 
 async function _buildPdfOverlay(pdfUrl) {
   const wrap   = document.getElementById('pdfOverlayWrap');
   const iframe = document.getElementById('pdfPreview');
-  if (!wrap || typeof PdfOverlay === 'undefined') return;
+  if (!wrap || !PdfOverlayLeft) return;
 
-  if (_pdfOverlayBuiltFor === pdfUrl && PdfOverlay.isReady()) {
+  if (_pdfOverlayBuiltFor === pdfUrl && PdfOverlayLeft.isReady()) {
     wrap.style.display = 'block';
     if (iframe) iframe.style.display = 'none';
-    PdfOverlay.highlight(State.entities);
+    PdfOverlayLeft.highlight(State.entities);
     return;
   }
 
   let ok = false;
   if (State.pageImages && State.pageImages.length) {
     // PDF scanné (OCR) : images + positions par mot déjà fournies par le serveur.
-    console.log('[PdfOverlay] chemin OCR —', State.pageImages.length, 'page(s) image');
-    ok = PdfOverlay.loadOcr(State.pageImages, State.pageBoxes, wrap);
+    ok = PdfOverlayLeft.loadOcr(State.pageImages, State.pageBoxes, wrap);
   } else {
     // PDF texte natif : rendu et positionnement 100% navigateur (pdfjs).
-    console.log('[PdfOverlay] chemin PDF natif —', typeof pdfjsLib === 'undefined' ? 'pdfjsLib absent !' : 'pdfjsLib chargé');
-    ok = await PdfOverlay.loadNative(pdfUrl, wrap);
+    ok = await PdfOverlayLeft.loadNative(pdfUrl, wrap);
   }
 
   if (ok) {
     _pdfOverlayBuiltFor = pdfUrl;
     wrap.style.display = 'block';
     if (iframe) iframe.style.display = 'none';
-    PdfOverlay.highlight(State.entities);
+    PdfOverlayLeft.highlight(State.entities);
   } else {
     // Repli sur l'iframe brute (ex : pdfjs indisponible/échec de rendu).
-    console.warn('[PdfOverlay] échec construction overlay — repli sur iframe brute');
     _pdfOverlayBuiltFor = null;
     wrap.style.display = 'none';
     if (iframe) iframe.style.display = 'block';
@@ -5250,6 +5268,78 @@ async function _buildPdfOverlay(pdfUrl) {
 function _hidePdfOverlay() {
   const wrap = document.getElementById('pdfOverlayWrap');
   if (wrap) wrap.style.display = 'none';
+}
+
+// Panneau DROIT (step 3 uniquement) — PdfOverlayRight, conteneur
+// #rightPdfWrap dans #ocrSplitRight, activé par le toggle Texte/Original.
+let _rightPdfOverlayBuiltFor = null;
+
+async function _buildRightPdfOverlay() {
+  const wrap = document.getElementById('rightPdfWrap');
+  if (!wrap || !PdfOverlayRight) return;
+
+  const isSourcePdf = !State.sourceIsText && !!State.sourceBlobUrl;
+  if (!isSourcePdf) {
+    // Pas de PDF source (TXT, ou blob perdu après un rechargement de page) :
+    // repli sur un PDF de référence chargé manuellement, sans surlignage
+    // (ce n'est pas le document analysé — cf. triggerLoadRefPdf).
+    if (State.refDocUrl) {
+      wrap.innerHTML = `<iframe class="split-pdf" style="width:100%;height:100%;border:0" src="${State.refDocUrl}" title="PDF de référence"></iframe>`;
+    } else {
+      wrap.innerHTML = `<div class="pdfov-empty">
+        Aucun PDF source disponible pour cette vue (document texte, ou fichier PDF perdu après un rechargement de page).
+        <br><button class="btn-sm btn-outline" onclick="triggerLoadRefPdf()" style="margin-top:8px">
+          <i data-lucide="paperclip"></i> Charger un PDF de référence
+        </button>
+      </div>`;
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+    return;
+  }
+  const pdfUrl = State.sourceBlobUrl;
+
+  if (_rightPdfOverlayBuiltFor === pdfUrl && PdfOverlayRight.isReady()) {
+    PdfOverlayRight.highlight(State.entities);
+    return;
+  }
+
+  let ok = false;
+  if (State.pageImages && State.pageImages.length) {
+    ok = PdfOverlayRight.loadOcr(State.pageImages, State.pageBoxes, wrap);
+  } else {
+    ok = await PdfOverlayRight.loadNative(pdfUrl, wrap);
+  }
+
+  if (ok) {
+    _rightPdfOverlayBuiltFor = pdfUrl;
+    PdfOverlayRight.highlight(State.entities);
+  } else {
+    _rightPdfOverlayBuiltFor = null;
+    wrap.innerHTML = '<div class="pdfov-empty">Aperçu du document original indisponible.</div>';
+  }
+}
+
+/**
+ * Bascule Texte ↔ Original dans le panneau droit (step 3 uniquement).
+ * @param {string} view  'texte' | 'original'
+ */
+function setRightPanelView(view) {
+  _rightPanelView = view;
+  const btnTexte    = document.getElementById('rvtBtnTexte');
+  const btnOriginal = document.getElementById('rvtBtnOriginal');
+  const viewerWrap  = document.getElementById('viewerWrap');
+  const pdfWrap     = document.getElementById('rightPdfWrap');
+  if (btnTexte)    btnTexte.classList.toggle('active', view === 'texte');
+  if (btnOriginal) btnOriginal.classList.toggle('active', view === 'original');
+
+  if (view === 'original') {
+    if (viewerWrap) viewerWrap.style.display = 'none';
+    if (pdfWrap)    pdfWrap.style.display = 'flex';
+    _buildRightPdfOverlay();
+  } else {
+    if (viewerWrap) viewerWrap.style.display = 'flex';
+    if (pdfWrap)    pdfWrap.style.display = 'none';
+  }
 }
 
 async function initOriginalPreview() {
@@ -6108,10 +6198,10 @@ function refreshEntityViewer() {
   ViewerState.mode = prevMode;
   // Ajouter les listeners après le rebuild DOM (setTimeout garantit que innerHTML est fini)
   setTimeout(() => addEntityClickListeners(), 0);
-  // Redessiner le surlignage sur le document original si l'overlay est actif
-  if (typeof PdfOverlay !== 'undefined' && PdfOverlay.isReady()) {
-    PdfOverlay.highlight(State.entities);
-  }
+  // Redessiner le surlignage sur le document original si un overlay est actif
+  // (gauche = step 2, droite = step 3 — au plus un des deux est visible)
+  if (PdfOverlayLeft  && PdfOverlayLeft.isReady())  PdfOverlayLeft.highlight(State.entities);
+  if (PdfOverlayRight && PdfOverlayRight.isReady()) PdfOverlayRight.highlight(State.entities);
 }
 
 /**

@@ -491,13 +491,11 @@
                 </button>
               </div>
             </div>
-            <!-- Step 3 : toggle PDF / Entités -->
+            <!-- Step 3 : panneau gauche toujours sur les entités (le bascule
+                 Texte/Original a migré dans le panneau droit, cf. #rightViewToggle) -->
             <div id="headerEntitiesPanel" style="display:none">
               <div class="left-panel-toggle">
-                <button class="lpt-btn active" id="lptBtnPdf" onclick="setLeftPanelView('pdf')" title="Voir le document original">
-                  <i data-lucide="file-text"></i>
-                </button>
-                <button class="lpt-btn" id="lptBtnEnt" onclick="setLeftPanelView('entities')" title="Voir les entités">
+                <button class="lpt-btn active" id="lptBtnEnt" onclick="setLeftPanelView('entities')" title="Voir les entités">
                   <i data-lucide="search"></i>
                   <span class="lpt-count" id="entityCount">0</span>
                 </button>
@@ -506,12 +504,6 @@
                   <span id="oublisBadge" class="badge-oublis" style="display:none">0</span>
                 </button>
               </div>
-              <button class="btn-sm btn-outline" id="btnLoadRefPdf"
-                onclick="triggerLoadRefPdf()"
-                title="Charger un PDF original pour le visualiser en référence"
-                style="display:none; margin-left:6px; font-size:11px">
-                <i data-lucide="paperclip"></i>
-              </button>
               <span class="entity-count-small">
                 <span id="entityActive">0</span> actives
               </span>
@@ -527,6 +519,11 @@
 
           <div class="split-header-right">
             <span class="split-col-label" id="rightPanelLabel"><i data-lucide="file-edit"></i><span>Texte corrigé</span></span>
+            <!-- Bascule Texte / Original (document avec entités surlignées dessus) — step 3 uniquement -->
+            <div class="right-view-toggle" id="rightViewToggle" style="display:none">
+              <button class="rvt-btn active" id="rvtBtnTexte" onclick="setRightPanelView('texte')">Texte</button>
+              <button class="rvt-btn" id="rvtBtnOriginal" onclick="setRightPanelView('original')">Original</button>
+            </div>
             <!-- Toggle prévisualisation anonymisée (step 3 uniquement) -->
             <label class="anon-preview-toggle" id="anonPreviewToggle" style="display:none" title="Prévisualiser le texte anonymisé">
               <input type="checkbox" id="anonPreviewSwitch" onchange="toggleAnonPreview(this.checked)">
@@ -760,6 +757,8 @@
               <div class="viewer-gutter" id="viewerGutter" aria-hidden="true"></div>
               <div class="text-viewer" id="textViewer"></div>
             </div>
+            <!-- Document original avec entités surlignées dessus (onglet "Original", step 3) -->
+            <div id="rightPdfWrap" class="pdfov-wrap" style="display:none"></div>
             <div class="viewer-footer">
               <span id="viewerStats" class="viewer-stats"></span>
             </div>

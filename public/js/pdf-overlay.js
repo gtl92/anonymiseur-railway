@@ -11,69 +11,130 @@
  *
  * Toutes les positions sont normalisées en fractions [0..1] de la largeur/
  * hauteur de page — insensible au zoom/redimensionnement de l'affichage.
+ *
+ * createPdfOverlay() renvoie une instance indépendante (ses propres pages,
+ * son propre conteneur DOM) : l'app en crée une par emplacement d'affichage
+ * (ex. panneau gauche step 2, panneau droit step 3) pour éviter qu'une
+ * instance n'efface le rendu d'une autre en se rechargeant.
  */
-const PdfOverlay = (() => {
 
-  let _pages     = [];  // [{ words: [{text,left,top,width,height}] (fractions 0..1) }]
-  let _container = null;
-  let _pdfjsReady = false;
-  let _lastEntities = null; // pour redessiner une fois les images OCR chargées (async)
+// pdfjs est un singleton navigateur (worker global) : sa configuration ne
+// dépend d'aucune instance et ne se fait qu'une fois, quel que soit le
+// nombre d'overlays créés par createPdfOverlay().
+let _pdfjsReady = false;
+function ensurePdfjs() {
+  if (_pdfjsReady) return true;
+  if (typeof pdfjsLib === 'undefined') return false;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/vendor/pdfjs/pdf.worker.min.js';
+  _pdfjsReady = true;
+  return true;
+}
 
-  function ensurePdfjs() {
-    if (_pdfjsReady) return true;
-    if (typeof pdfjsLib === 'undefined') return false;
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/vendor/pdfjs/pdf.worker.min.js';
-    _pdfjsReady = true;
-    return true;
+// ── Découpage d'un fragment de texte pdfjs en mots + position fractionnelle
+// sur la largeur du fragment (approximation proportionnelle au nombre de
+// caractères — suffisant pour un rectangle de surlignage, pas pour une
+// sélection pixel-perfect). ─────────────────────────────────────────────────
+function splitFragmentIntoWords(str) {
+  const out = [];
+  const re = /\S+/g;
+  let m;
+  while ((m = re.exec(str)) !== null) {
+    out.push({
+      text:      m[0],
+      startFrac: m.index / str.length,
+      endFrac:   (m.index + m[0].length) / str.length,
+    });
   }
+  return out;
+}
+
+/** Mots + position (fractions de page) d'une page pdfjs déjà chargée. */
+async function nativePageWords(page, viewport) {
+  const content = await page.getTextContent();
+  const words = [];
+  for (const item of content.items) {
+    if (!item.str || !item.str.trim()) continue;
+    const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+    const scaleX    = Math.hypot(tx[0], tx[1]);
+    const fontHeight = Math.hypot(tx[2], tx[3]);
+    const widthPx    = item.width * scaleX;
+    const x = tx[4];
+    // tx[5] = position de la LIGNE DE BASE (bas du texte, hors jambages) en
+    // pixels viewport. L'ascendant réel couvre ~80% de la hauteur de fonte
+    // (le reste est la marge interne de la police) ; on descend un peu sous
+    // la ligne de base pour couvrir les jambages (g, p, q, y).
+    const yTop    = tx[5] - fontHeight * 0.82;
+    const boxH    = fontHeight * 0.98;
+    for (const w of splitFragmentIntoWords(item.str)) {
+      words.push({
+        text:   w.text,
+        left:   (x + w.startFrac * widthPx) / viewport.width,
+        top:    yTop / viewport.height,
+        width:  ((w.endFrac - w.startFrac) * widthPx) / viewport.width,
+        height: boxH / viewport.height,
+      });
+    }
+  }
+  return words;
+}
+
+// ── Correspondance entités ↔ mots de page (pure, partagée entre instances) ──
+
+function foldTok(s) {
+  return (s || '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '');
+}
+
+function candidateTokenLists(entity) {
+  const vals = [entity.value, ...(entity.aliases || [])].filter(Boolean);
+  return vals
+    .map(v => v.trim().split(/\s+/).map(foldTok).filter(Boolean))
+    .filter(toks => toks.length > 0);
+}
+
+/** Rectangles fusionnés (fractions de page) des occurrences d'une entité sur une page. */
+function matchesForPage(pageWords, entity) {
+  const pageTokens = pageWords.map(w => foldTok(w.text));
+  const rects = [];
+  for (const cand of candidateTokenLists(entity)) {
+    for (let i = 0; i <= pageTokens.length - cand.length; i++) {
+      let ok = true;
+      for (let j = 0; j < cand.length; j++) {
+        if (pageTokens[i + j] !== cand[j]) { ok = false; break; }
+      }
+      if (!ok) continue;
+      const span = pageWords.slice(i, i + cand.length);
+      const left   = Math.min(...span.map(w => w.left));
+      const top    = Math.min(...span.map(w => w.top));
+      const right  = Math.max(...span.map(w => w.left + w.width));
+      const bottom = Math.max(...span.map(w => w.top + w.height));
+      rects.push({ left, top, width: right - left, height: bottom - top });
+    }
+  }
+  return rects;
+}
+
+/** Classe CSS de surlignage par type d'entité (cohérent avec le mode texte). */
+function typeClass(type) {
+  const t = (type || '').toLowerCase().split('_')[0];
+  return `pdfov-hl-${t || 'val'}`;
+}
+
+/**
+ * Crée une instance de surlignage indépendante, liée à un emplacement
+ * d'affichage donné (son propre conteneur DOM, ses propres pages).
+ */
+function createPdfOverlay() {
+  let _pages        = [];  // [{ el, words: [{text,left,top,width,height}] (fractions 0..1) }]
+  let _container    = null;
+  let _lastEntities = null; // pour redessiner une fois les images OCR chargées (async)
 
   function clear() {
     _pages = [];
     _lastEntities = null;
     if (_container) _container.innerHTML = '';
-  }
-
-  // ── Découpage d'un fragment de texte pdfjs en mots + position fractionnelle
-  //    sur la largeur du fragment (approximation proportionnelle au nombre de
-  //    caractères — suffisant pour un rectangle de surlignage, pas pour une
-  //    sélection pixel-perfect). ────────────────────────────────────────────
-  function splitFragmentIntoWords(str) {
-    const out = [];
-    const re = /\S+/g;
-    let m;
-    while ((m = re.exec(str)) !== null) {
-      out.push({
-        text:       m[0],
-        startFrac:  m.index / str.length,
-        endFrac:    (m.index + m[0].length) / str.length,
-      });
-    }
-    return out;
-  }
-
-  /** Mots + position (fractions de page) d'une page pdfjs déjà chargée. */
-  async function nativePageWords(page, viewport) {
-    const content = await page.getTextContent();
-    const words = [];
-    for (const item of content.items) {
-      if (!item.str || !item.str.trim()) continue;
-      const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
-      const scaleX     = Math.hypot(tx[0], tx[1]);
-      const fontHeight  = Math.hypot(tx[2], tx[3]);
-      const widthPx     = item.width * scaleX;
-      const x = tx[4];
-      const yTop = tx[5] - fontHeight;
-      for (const w of splitFragmentIntoWords(item.str)) {
-        words.push({
-          text:   w.text,
-          left:   (x + w.startFrac * widthPx) / viewport.width,
-          top:    yTop / viewport.height,
-          width:  ((w.endFrac - w.startFrac) * widthPx) / viewport.width,
-          height: fontHeight / viewport.height,
-        });
-      }
-    }
-    return words;
   }
 
   /**
@@ -91,7 +152,7 @@ const PdfOverlay = (() => {
     try {
       doc = await pdfjsLib.getDocument(blobUrl).promise;
     } catch (err) {
-      console.error('[PdfOverlay] échec chargement pdfjs :', err);
+      console.error('[PdfOverlay] échec chargement pdfjs, repli sur l\'iframe brute :', err);
       return false;
     }
 
@@ -112,7 +173,6 @@ const PdfOverlay = (() => {
 
       const words = await nativePageWords(page, viewport);
       _pages.push({ el: pageEl, words });
-      console.log(`[PdfOverlay] page ${n} : ${words.length} mots indexés`, words.slice(0, 8));
     }
     return true;
   }
@@ -152,7 +212,6 @@ const PdfOverlay = (() => {
           });
         }
         _pages[i].words = words;
-        console.log(`[PdfOverlay] page OCR ${i + 1} : ${words.length} mots indexés (image ${nw}x${nh})`);
         if (_lastEntities) highlight(_lastEntities); // rattrape le surlignage demandé avant chargement
       }, { once: true });
 
@@ -161,62 +220,14 @@ const PdfOverlay = (() => {
     return true;
   }
 
-  // ── Correspondance entités ↔ mots de page ────────────────────────────────
-
-  function foldTok(s) {
-    return (s || '')
-      .normalize('NFD').replace(/[̀-ͯ]/g, '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '');
-  }
-
-  function candidateTokenLists(entity) {
-    const vals = [entity.value, ...(entity.aliases || [])].filter(Boolean);
-    return vals
-      .map(v => v.trim().split(/\s+/).map(foldTok).filter(Boolean))
-      .filter(toks => toks.length > 0);
-  }
-
-  /** Rectangles fusionnés (fractions de page) des occurrences d'une entité sur une page. */
-  function matchesForPage(pageWords, entity) {
-    const pageTokens = pageWords.map(w => foldTok(w.text));
-    const rects = [];
-    for (const cand of candidateTokenLists(entity)) {
-      for (let i = 0; i <= pageTokens.length - cand.length; i++) {
-        let ok = true;
-        for (let j = 0; j < cand.length; j++) {
-          if (pageTokens[i + j] !== cand[j]) { ok = false; break; }
-        }
-        if (!ok) continue;
-        const span = pageWords.slice(i, i + cand.length);
-        const left   = Math.min(...span.map(w => w.left));
-        const top    = Math.min(...span.map(w => w.top));
-        const right  = Math.max(...span.map(w => w.left + w.width));
-        const bottom = Math.max(...span.map(w => w.top + w.height));
-        rects.push({ left, top, width: right - left, height: bottom - top });
-      }
-    }
-    return rects;
-  }
-
-  /** Classe CSS de surlignage par type d'entité (cohérent avec le mode texte). */
-  function typeClass(type) {
-    const t = (type || '').toLowerCase().split('_')[0];
-    return `pdfov-hl-${t || 'val'}`;
-  }
-
   /**
    * (Re)dessine les surlignages pour la liste d'entités actives fournie.
    * Idempotent : retire les surlignages précédents avant de redessiner.
    */
   function highlight(entities) {
     _lastEntities = entities;
-    if (!_pages.length) {
-      console.warn('[PdfOverlay] highlight() appelé mais aucune page chargée');
-      return;
-    }
+    if (!_pages.length) return;
     const active = (entities || []).filter(e => e && e.active && !e.blocked && e.value);
-    let totalRects = 0;
 
     for (const page of _pages) {
       page.el.querySelectorAll('.pdfov-hl').forEach(n => n.remove());
@@ -231,11 +242,9 @@ const PdfOverlay = (() => {
           box.style.height = (rect.height * 100) + '%';
           box.title = entity.value;
           page.el.appendChild(box);
-          totalRects++;
         }
       }
     }
-    console.log(`[PdfOverlay] highlight() : ${active.length} entité(s) active(s), ${totalRects} rectangle(s) dessiné(s) sur ${_pages.length} page(s)`);
   }
 
   function isReady() {
@@ -243,4 +252,4 @@ const PdfOverlay = (() => {
   }
 
   return { loadNative, loadOcr, highlight, clear, isReady };
-})();
+}
