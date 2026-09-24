@@ -244,7 +244,6 @@ function switchLeftPanel(step) {
   document.body.classList.toggle('step3-active', step === 3);
 
   const headerPdf   = document.getElementById('headerPdfPanel');
-  const headerEnt   = document.getElementById('headerEntitiesPanel');
   const viewerHint  = document.getElementById('viewerHint');
   const step3Header = document.getElementById('step3RightHeader');
   const step2Actions = document.getElementById('step2Actions');
@@ -256,7 +255,6 @@ function switchLeftPanel(step) {
   const isStep3 = step === 3;
 
   if (headerPdf)    headerPdf.style.display    = isStep2 ? 'flex' : 'none';
-  if (headerEnt)    headerEnt.style.display    = isStep3 ? 'flex' : 'none';
   if (viewerHint)   viewerHint.style.display   = isStep2 ? 'flex' : 'none';
   if (step3Header)  step3Header.style.display  = isStep3 ? 'flex' : 'none';
   if (rightToggle)  rightToggle.style.display  = isStep3 ? 'flex' : 'none';
