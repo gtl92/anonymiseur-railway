@@ -373,20 +373,42 @@
     <!-- Barre de contrôle OCR (visible en step 2 uniquement) -->
     <div class="ocr-controlbar" id="ocrControlbar" style="display:none">
       <div class="ocr-ctrl-group">
-        <button class="btn-sm btn-outline" onclick="saveStep2Txt()" class="btn-sm btn-outline ocr-tools-only" title="Sauvegarder le texte en .txt"><i data-lucide="save"></i><span>Sauvegarder</span></button>
-        <button class="btn-sm btn-outline" onclick="triggerStep2EntitiesImport()" class="btn-sm btn-outline ocr-tools-only" title="Importer entités JSON/CSV"><i data-lucide="download"></i><span>Entités</span></button>
+        <button class="btn-sm btn-outline ocr-tools-only" onclick="saveStep2Txt()" title="Sauvegarder le texte en .txt"><i data-lucide="save"></i><span>Sauvegarder</span></button>
+        <button class="btn-sm btn-outline ocr-tools-only" onclick="triggerStep2EntitiesImport()" title="Importer entités JSON/CSV"><i data-lucide="download"></i><span>Entités</span></button>
         <input type="file" id="step2EntitiesInput" accept=".json,.csv" style="display:none" onchange="handleStep2EntitiesImport(event)">
 
         <div class="ocr-ctrl-sep"></div>
-        <div class="split-dropdown" id="sdSauts">
-          <button class="btn-sm btn-outline split-main" onclick="detectSuspectBreaks()" title="Détecter les sauts suspects depuis le début"><i data-lucide="corner-down-left"></i><span>Sauts</span></button><button class="btn-sm btn-outline split-arrow" onclick="toggleSplitDropdown('sdSauts', event)" title="Options">▾</button>
+        <!-- Outils de correction du TEXTE (sauts de ligne, espaces) — ne
+             s'appliquent qu'à la vue texte, regroupés pour ne pas encombrer
+             la barre. -->
+        <div class="ebar-actions-dropdown ocr-tools-only" id="ocrCorrectionsDropdown">
+          <button class="btn-sm btn-outline ebar-actions-btn" onclick="toggleOcrCorrectionsMenu()" title="Outils de correction du texte (sauts de ligne, espaces)">
+            <i data-lucide="wrench"></i><span>Corrections texte</span>
+            <span class="lb-badge-inline" id="lbSuspectCount" style="display:none">—</span>
+            <i data-lucide="chevron-down" class="caret"></i>
+          </button>
+          <div class="ebar-actions-menu" id="ocrCorrectionsMenu" style="display:none">
+            <button onclick="detectSuspectBreaks(); closeOcrCorrectionsMenu()" title="Détecter les sauts suspects depuis le début">
+              <i data-lucide="corner-down-left"></i><span>Sauts suspects — depuis le début</span>
+            </button>
+            <button onclick="detectSuspectBreaksFromHere(); closeOcrCorrectionsMenu()" title="Détecter les sauts suspects depuis ici">
+              <i data-lucide="corner-down-left"></i><span>Sauts suspects — depuis ici</span>
+            </button>
+            <button onclick="autoFixAllBreaks(); closeOcrCorrectionsMenu()" title="Auto-corriger tous les sauts">
+              <i data-lucide="zap"></i><span>Auto-corriger tous les sauts</span>
+            </button>
+            <button onclick="reduceMultipleBlankLines(); closeOcrCorrectionsMenu()" title="Réduire les sauts multiples à 1 ligne vide">
+              <i data-lucide="chevrons-up-down"></i><span>Réduire les lignes vides</span>
+            </button>
+            <div class="ebar-menu-sep"></div>
+            <button onclick="detectSpacedLetters(); closeOcrCorrectionsMenu()" title="Détecter les espaces parasites depuis le début">
+              <i data-lucide="sparkle"></i><span>Espaces parasites — depuis le début</span>
+            </button>
+            <button onclick="detectSpacedLettersFromHere(); closeOcrCorrectionsMenu()" title="Détecter les espaces parasites depuis ici">
+              <i data-lucide="sparkle"></i><span>Espaces parasites — depuis ici</span>
+            </button>
+          </div>
         </div>
-        <button class="btn-sm btn-outline" onclick="autoFixAllBreaks()" class="btn-sm btn-outline ocr-tools-only" title="Auto-corriger tous les sauts"><i data-lucide="zap"></i><span>Auto</span></button>
-        <button class="btn-sm btn-outline" onclick="reduceMultipleBlankLines()" title="Réduire les sauts multiples à 1 ligne vide"><i data-lucide="chevrons-up-down"></i><span>Lignes</span></button>
-        <div class="split-dropdown" id="sdEspaces">
-          <button class="btn-sm btn-outline split-main" onclick="detectSpacedLetters()" title="Détecter les espaces parasites depuis le début"><i data-lucide="sparkle"></i><span>Espaces</span></button><button class="btn-sm btn-outline split-arrow" onclick="toggleSplitDropdown('sdEspaces', event)" title="Options">▾</button>
-        </div>
-        <span class="lb-badge-inline" id="lbSuspectCount" class="lb-badge-inline ocr-tools-only" style="display:none">—</span>
       </div>
       <div class="search-box ocr-ctrl-search ocr-tools-only" id="viewerSearchBox">
         <input type="text" id="viewerSearch" class="search-input" placeholder="Rechercher…"
@@ -404,7 +426,7 @@
 
       </div>
       <div class="ocr-ctrl-group">
-        <button class="btn-sm btn-outline" id="btnRulesToggle" class="btn-sm btn-outline ocr-tools-only" onclick="toggleRulesDrawer()">
+        <button class="btn-sm btn-outline ocr-tools-only" id="btnRulesToggle" onclick="toggleRulesDrawer()">
           <i data-lucide="wrench"></i><span>Règles</span> <span class="badge" id="ocrRuleCount">0</span>
         </button>
       </div>
@@ -1418,70 +1440,6 @@
       </div>
     </div>
   </div>
-
-  <!-- Split-dropdown logic -->
-  <script>
-  // Définition des menus : id du wrapper → items
-  const SPLIT_MENUS = {
-    'sdSauts': [
-      { label: 'Depuis le début', action: 'detectSuspectBreaks()' },
-      { label: 'Depuis ici',      action: 'detectSuspectBreaksFromHere()' }
-    ],
-    'sdEspaces': [
-      { label: 'Depuis le début', action: 'detectSpacedLetters()' },
-      { label: 'Depuis ici',      action: 'detectSpacedLettersFromHere()' }
-    ]
-  };
-
-  // Créer les menus dans le <body> au chargement (hors de tout conteneur)
-  document.addEventListener('DOMContentLoaded', function() {
-    for (const [id, items] of Object.entries(SPLIT_MENUS)) {
-      const menu = document.createElement('div');
-      menu.className = 'split-menu';
-      menu.id = id + 'Menu';
-      menu.dataset.owner = id;
-      items.forEach(item => {
-        const btn = document.createElement('button');
-        btn.textContent = item.label;
-        btn.onclick = function(e) {
-          e.stopPropagation();
-          eval(item.action);
-          closeAllSplitMenus();
-        };
-        menu.appendChild(btn);
-      });
-      document.body.appendChild(menu);
-    }
-  });
-
-  function closeAllSplitMenus() {
-    document.querySelectorAll('.split-menu.open').forEach(m => m.classList.remove('open'));
-  }
-
-  function toggleSplitDropdown(id, event) {
-    if (event) event.stopPropagation();
-    const menu   = document.getElementById(id + 'Menu');
-    const arrow  = document.getElementById(id).querySelector('.split-arrow');
-    const isOpen = menu.classList.contains('open');
-    closeAllSplitMenus();
-    if (!isOpen) {
-      const rect = arrow.getBoundingClientRect();
-      menu.style.top  = (rect.bottom + 4) + 'px';
-      menu.style.left = rect.left + 'px';
-      menu.classList.add('open');
-    }
-  }
-
-  function closeSplitDropdown(id) {
-    const menu = document.getElementById(id + 'Menu');
-    if (menu) menu.classList.remove('open');
-  }
-
-  // Clic extérieur → fermer (avec délai pour laisser toggleSplitDropdown finir)
-  document.addEventListener('click', function(e) {
-    if (!e.target.closest('.split-arrow')) closeAllSplitMenus();
-  });
-  </script>
 
   <!-- ══ Modale Recherche / Remplacement (non-bloquante, draggable) ══ -->
   <div id="rrModal" class="rr-modal" style="display:none;" role="dialog" aria-label="Rechercher / Remplacer">

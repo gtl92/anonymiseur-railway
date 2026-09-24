@@ -7334,6 +7334,29 @@ function closeEbarActions() {
   if (menu) menu.style.display = 'none';
 }
 
+/** Menu "Corrections texte" (step 2) — regroupe Sauts/Auto/Lignes/Espaces. */
+function toggleOcrCorrectionsMenu() {
+  const menu = document.getElementById('ocrCorrectionsMenu');
+  if (!menu) return;
+  const isOpen = menu.style.display !== 'none';
+  menu.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) {
+    setTimeout(() => {
+      document.addEventListener('click', function handler(e) {
+        if (!document.getElementById('ocrCorrectionsDropdown')?.contains(e.target)) {
+          closeOcrCorrectionsMenu();
+          document.removeEventListener('click', handler);
+        }
+      });
+    }, 10);
+  }
+}
+
+function closeOcrCorrectionsMenu() {
+  const menu = document.getElementById('ocrCorrectionsMenu');
+  if (menu) menu.style.display = 'none';
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // MODALE CONFIRM CUSTOM — remplace confirm() natif du navigateur
 // ════════════════════════════════════════════════════════════════════════════

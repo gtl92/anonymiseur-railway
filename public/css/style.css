@@ -1043,32 +1043,6 @@ body.settings-open { overflow: hidden; }
   font-family: var(--font-mono);
 }
 
-/* Split dropdown buttons */
-.split-dropdown { display: inline-flex; }
-.split-dropdown .split-main { border-radius: var(--radius-sm) 0 0 var(--radius-sm); border-right: 0; }
-.split-dropdown .split-arrow { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding: 6px 8px; font-size: 10px; }
-.split-menu {
-  position: fixed; z-index: 250;
-  background: var(--bg-3);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-md);
-  padding: 4px;
-  min-width: 180px;
-  display: none;
-}
-.split-menu.open { display: block; }
-.split-menu button {
-  display: block; width: 100%;
-  padding: 8px 12px;
-  text-align: left;
-  background: transparent;
-  border-radius: 6px;
-  font-size: 12px;
-  color: var(--fg-2);
-}
-.split-menu button:hover { background: var(--bg-4); color: var(--fg-1); }
-
 /* Search box (used in toolbars) */
 .search-box {
   display: inline-flex; align-items: center; gap: 2px;
