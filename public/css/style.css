@@ -1242,6 +1242,11 @@ body.settings-open { overflow: hidden; }
   overflow: auto;
   background: var(--bg-3);
   padding: 12px;
+  display: flex;
+  flex-direction: column; /* empile les pages verticalement — sans ça, display:flex
+                              (posé en JS pour l'onglet Original) les aligne en ligne
+                              et les écrase, désynchronisant le surlignage en %. */
+  align-items: center;
 }
 .pdfov-page {
   position: relative;
