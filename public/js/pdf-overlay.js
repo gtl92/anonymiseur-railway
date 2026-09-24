@@ -90,7 +90,8 @@ const PdfOverlay = (() => {
     let doc;
     try {
       doc = await pdfjsLib.getDocument(blobUrl).promise;
-    } catch {
+    } catch (err) {
+      console.error('[PdfOverlay] échec chargement pdfjs :', err);
       return false;
     }
 
@@ -111,6 +112,7 @@ const PdfOverlay = (() => {
 
       const words = await nativePageWords(page, viewport);
       _pages.push({ el: pageEl, words });
+      console.log(`[PdfOverlay] page ${n} : ${words.length} mots indexés`, words.slice(0, 8));
     }
     return true;
   }
@@ -150,6 +152,7 @@ const PdfOverlay = (() => {
           });
         }
         _pages[i].words = words;
+        console.log(`[PdfOverlay] page OCR ${i + 1} : ${words.length} mots indexés (image ${nw}x${nh})`);
         if (_lastEntities) highlight(_lastEntities); // rattrape le surlignage demandé avant chargement
       }, { once: true });
 
@@ -208,8 +211,12 @@ const PdfOverlay = (() => {
    */
   function highlight(entities) {
     _lastEntities = entities;
-    if (!_pages.length) return;
+    if (!_pages.length) {
+      console.warn('[PdfOverlay] highlight() appelé mais aucune page chargée');
+      return;
+    }
     const active = (entities || []).filter(e => e && e.active && !e.blocked && e.value);
+    let totalRects = 0;
 
     for (const page of _pages) {
       page.el.querySelectorAll('.pdfov-hl').forEach(n => n.remove());
@@ -224,9 +231,11 @@ const PdfOverlay = (() => {
           box.style.height = (rect.height * 100) + '%';
           box.title = entity.value;
           page.el.appendChild(box);
+          totalRects++;
         }
       }
     }
+    console.log(`[PdfOverlay] highlight() : ${active.length} entité(s) active(s), ${totalRects} rectangle(s) dessiné(s) sur ${_pages.length} page(s)`);
   }
 
   function isReady() {

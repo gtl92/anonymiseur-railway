@@ -5225,9 +5225,11 @@ async function _buildPdfOverlay(pdfUrl) {
   let ok = false;
   if (State.pageImages && State.pageImages.length) {
     // PDF scanné (OCR) : images + positions par mot déjà fournies par le serveur.
+    console.log('[PdfOverlay] chemin OCR —', State.pageImages.length, 'page(s) image');
     ok = PdfOverlay.loadOcr(State.pageImages, State.pageBoxes, wrap);
   } else {
     // PDF texte natif : rendu et positionnement 100% navigateur (pdfjs).
+    console.log('[PdfOverlay] chemin PDF natif —', typeof pdfjsLib === 'undefined' ? 'pdfjsLib absent !' : 'pdfjsLib chargé');
     ok = await PdfOverlay.loadNative(pdfUrl, wrap);
   }
 
@@ -5237,7 +5239,8 @@ async function _buildPdfOverlay(pdfUrl) {
     if (iframe) iframe.style.display = 'none';
     PdfOverlay.highlight(State.entities);
   } else {
-    // Repli silencieux sur l'iframe brute (ex : pdfjs indisponible/échec de rendu).
+    // Repli sur l'iframe brute (ex : pdfjs indisponible/échec de rendu).
+    console.warn('[PdfOverlay] échec construction overlay — repli sur iframe brute');
     _pdfOverlayBuiltFor = null;
     wrap.style.display = 'none';
     if (iframe) iframe.style.display = 'block';
