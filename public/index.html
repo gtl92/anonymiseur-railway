@@ -593,6 +593,17 @@
                   title="Rien à annuler" disabled style="opacity:0.4">
                   <i data-lucide="undo-2"></i>
                 </button>
+                <div class="left-panel-toggle">
+                  <button class="lpt-btn active" id="lptBtnEnt" onclick="setLeftPanelView('entities')" title="Nombre d'entités détectées">
+                    <i data-lucide="search"></i>
+                    <span class="lpt-count" id="entityCount">0</span>
+                  </button>
+                  <button class="lpt-btn lpt-btn-verify" id="lptBtnVerify" onclick="toggleOublisPanel()" title="Vérifier les oublis d'anonymisation">
+                    <i data-lucide="shield-alert"></i>
+                    <span id="oublisBadge" class="badge-oublis" style="display:none">0</span>
+                  </button>
+                </div>
+                <span class="entity-count-small"><span id="entityActive">0</span> actives</span>
               </div>
               <!-- Bulk actions — affiché par app.js quand cases cochées/décochées -->
               <div class="ebar-bulk" id="bulkActionsBar" style="display:none">
@@ -661,19 +672,6 @@
               <div class="right-view-toggle" id="rightViewToggle" style="display:none">
                 <button class="rvt-btn active" id="rvtBtnTexte" onclick="setRightPanelView('texte')">Texte</button>
                 <button class="rvt-btn" id="rvtBtnOriginal" onclick="setRightPanelView('original')">Original</button>
-              </div>
-              <div id="headerEntitiesPanel" style="display:none">
-                <div class="left-panel-toggle">
-                  <button class="lpt-btn active" id="lptBtnEnt" onclick="setLeftPanelView('entities')" title="Voir les entités">
-                    <i data-lucide="search"></i>
-                    <span class="lpt-count" id="entityCount">0</span>
-                  </button>
-                  <button class="lpt-btn lpt-btn-verify" id="lptBtnVerify" onclick="toggleOublisPanel()" title="Vérifier les oublis d'anonymisation">
-                    <i data-lucide="shield-alert"></i>
-                    <span id="oublisBadge" class="badge-oublis" style="display:none">0</span>
-                  </button>
-                </div>
-                <span class="entity-count-small"><span id="entityActive">0</span> actives</span>
               </div>
               <!-- Outils de correction du TEXTE (sauts de ligne, espaces) — ne
                    s'appliquent qu'à la vue texte (step 2), regroupés pour ne pas encombrer
