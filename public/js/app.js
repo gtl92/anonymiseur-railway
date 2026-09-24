@@ -7164,6 +7164,24 @@ async function importSession(event) {
     });
     if (!ok1) return;
 
+    // Purger les données PDF/OCR de l'éventuel document en cours : sinon
+    // pages/mots d'un ancien document restent en mémoire (State.pageImages,
+    // PdfOverlayLeft/Right._pages…) et se retrouvent surlignés avec les
+    // entités de la session importée — mismatch qui peut rendre la vue
+    // "Original" très lente, voire donner l'impression d'un gel.
+    if (State.sourceBlobUrl) { URL.revokeObjectURL(State.sourceBlobUrl); }
+    if (State.refDocUrl)     { URL.revokeObjectURL(State.refDocUrl); }
+    State.sourceBlobUrl = null;
+    State.sourceIsText  = true;
+    State.refDocUrl     = null;
+    State.pageBoxes     = null;
+    State.pageImages    = null;
+    if (PdfOverlayLeft)  PdfOverlayLeft.clear();
+    if (PdfOverlayRight) PdfOverlayRight.clear();
+    _pdfOverlayBuiltFor      = null;
+    _rightPdfOverlayBuiltFor = null;
+    _rightPanelView = 'texte';
+
     // Restaurer l'état
     State.rawText       = session.rawText       || '';
     State.rawText       = State.rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -7266,6 +7284,14 @@ function importSessionData(session) {
   State.processedText = State.processedText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   State.sourceIsText  = true;   // PDF non disponible après rechargement
   State.sourceBlobUrl = null;
+  State.refDocUrl      = null;
+  State.pageBoxes      = null;
+  State.pageImages     = null;
+  if (PdfOverlayLeft)  PdfOverlayLeft.clear();
+  if (PdfOverlayRight) PdfOverlayRight.clear();
+  _pdfOverlayBuiltFor      = null;
+  _rightPdfOverlayBuiltFor = null;
+  _rightPanelView = 'texte';
   State.sourceFileName = session.sourceFileName || '';
   State._sessionRestored = true; // Marquer la session comme restaurée
   State.entities      = (session.entities || []).map(e => ({
