@@ -511,12 +511,6 @@
             </div>
           </div>
 
-          <button class="panel-toggle-btn" id="btnCollapseLeft"
-            onclick="togglePanel('left')" title="Masquer / afficher le panneau gauche">◀</button>
-          <div class="split-header-divider"></div>
-          <button class="panel-toggle-btn" id="btnCollapseRight"
-            onclick="togglePanel('right')" title="Masquer / afficher le panneau droit">▶</button>
-
           <div class="split-header-right">
             <span class="split-col-label" id="rightPanelLabel"><i data-lucide="file-edit"></i><span>Texte corrigé</span></span>
             <!-- Bascule Texte / Original (document avec entités surlignées dessus) — step 3 uniquement -->
@@ -1387,47 +1381,6 @@
 <script src="js/mammoth.min.js"></script>
 
 
-<script>
-// ── Panel collapse toggle ─────────────────────────────────────────
-(function () {
-  const STATE = { left: true, right: true };
-
-  function updateUI() {
-    const left  = document.getElementById('ocrSplitLeft');
-    const right = document.getElementById('ocrSplitRight');
-    const cols  = document.getElementById('ocrSplitCols');
-    const btnL  = document.getElementById('btnCollapseLeft');
-    const btnR  = document.getElementById('btnCollapseRight');
-    if (!left || !right || !cols || !btnL || !btnR) return;
-
-    left.classList.toggle('panel-collapsed', !STATE.left);
-    right.classList.toggle('panel-collapsed', !STATE.right);
-    cols.classList.toggle('one-panel-mode', !STATE.left || !STATE.right);
-
-    if (!STATE.left && STATE.right) {
-      left.style.flex  = '0 0 0px';
-      right.style.flex = '1 1 100%';
-    } else if (STATE.left && !STATE.right) {
-      left.style.flex  = '1 1 100%';
-      right.style.flex = '0 0 0px';
-    } else {
-      left.style.flex  = '';
-      right.style.flex = '';
-    }
-
-    // Flèches : indiquent l'action possible (masquer ou rouvrir)
-    btnL.textContent = STATE.left  ? '◀' : '▶';
-    btnR.textContent = STATE.right ? '▶' : '◀';
-    btnL.classList.toggle('panel-active', !STATE.left);
-    btnR.classList.toggle('panel-active', !STATE.right);
-  }
-
-  window.togglePanel = function (side) {
-    STATE[side] = !STATE[side];
-    updateUI();
-  };
-})();
-</script>
 <!-- ── Modale de chargement ──────────────────────────────────────────────── -->
 <div id="loadingModal" style="display:none" aria-modal="true" role="dialog">
   <div class="loading-backdrop"></div>
