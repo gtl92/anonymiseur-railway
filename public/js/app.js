@@ -221,18 +221,6 @@ function goToStep(n) {
     renderOcrRules();
     refreshViewer();
     ensureOriginalDisplayed();
-    // Re-synchroniser le header gauche avec la colonne après affichage
-    requestAnimationFrame(() => {
-      const splitLeft  = document.getElementById('ocrSplitLeft');
-      const headerLeft = document.getElementById('splitHeaderLeft');
-      if (splitLeft && headerLeft) {
-        const w = splitLeft.getBoundingClientRect().width;
-        if (w > 0 && !headerLeft.style.width) {
-          headerLeft.style.width     = w + 'px';
-          headerLeft.style.flexShrink = '0';
-        }
-      }
-    });
   }
   if (n === 3) {
     refreshEntityViewer();
@@ -1572,9 +1560,6 @@ document.addEventListener('DOMContentLoaded', () => {
       splitLeft.style.width  = newLeftW + 'px';
       splitLeft.style.flex   = 'none';
       splitRight.style.flex  = '1';
-      // Synchroniser le header gauche
-      const hl = document.querySelector('.split-header-left');
-      if (hl) { hl.style.width = newLeftW + 'px'; hl.style.flexShrink = '0'; }
     });
 
     document.addEventListener('mouseup', () => {
@@ -1590,8 +1575,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const saved = localStorage.getItem('ocrSplitLeftW');
     if (saved) {
       splitLeft.style.width = saved; splitLeft.style.flex = 'none';
-      const headerLeft = document.querySelector('.split-header-left');
-      if (headerLeft) { headerLeft.style.width = saved; headerLeft.style.flexShrink = '0'; }
     }
   }
 
