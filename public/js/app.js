@@ -5237,10 +5237,15 @@ async function _buildPdfOverlay(pdfUrl) {
     return;
   }
 
-  // Rendu page par page (coûteux sur un document long) : spinner le temps
-  // que le premier affichage se fasse — les rechargements suivants du même
-  // document réutilisent le cache ci-dessus et ne passent pas par ici.
+  // Rendu page par page (coûteux sur un document long) + surlignage (coûteux
+  // si beaucoup d'entités, ex. après reprise d'une session déjà avancée) :
+  // spinner le temps des deux — les rechargements suivants du même document
+  // réutilisent le cache ci-dessus et ne passent pas par ici. Un tour de
+  // rAF avant de démarrer garantit que le spinner s'affiche réellement
+  // avant le calcul synchrone (sinon il peut être posé et retiré sans
+  // qu'aucune image ne soit peinte entre les deux).
   if (loading) loading.classList.add('active');
+  await new Promise(r => requestAnimationFrame(r));
   let ok = false;
   try {
     if (State.pageImages && State.pageImages.length) {
@@ -5250,6 +5255,7 @@ async function _buildPdfOverlay(pdfUrl) {
       // PDF texte natif : rendu et positionnement 100% navigateur (pdfjs).
       ok = await PdfOverlayLeft.loadNative(pdfUrl, wrap);
     }
+    if (ok) PdfOverlayLeft.highlight(State.entities);
   } finally {
     if (loading) loading.classList.remove('active');
   }
@@ -5258,7 +5264,6 @@ async function _buildPdfOverlay(pdfUrl) {
     _pdfOverlayBuiltFor = pdfUrl;
     wrap.style.display = 'block';
     if (iframe) iframe.style.display = 'none';
-    PdfOverlayLeft.highlight(State.entities);
   } else {
     // Repli sur l'iframe brute (ex : pdfjs indisponible/échec de rendu).
     _pdfOverlayBuiltFor = null;
@@ -5337,15 +5342,22 @@ async function _buildRightPdfOverlay() {
     return;
   }
 
-  // Rendu page par page (coûteux sur un document long) : spinner le temps
-  // que le premier affichage se fasse.
+  // Rendu page par page (coûteux sur un document long) + surlignage (coûteux
+  // si beaucoup d'entités, ex. après reprise d'une session déjà avancée) :
+  // spinner le temps des deux. Un tour de rAF avant de démarrer garantit
+  // que le spinner s'affiche réellement avant le calcul synchrone.
   if (loading) loading.classList.add('active');
+  await new Promise(r => requestAnimationFrame(r));
   let ok = false;
   try {
     if (State.pageImages && State.pageImages.length) {
       ok = await PdfOverlayRight.loadOcr(State.pageImages, State.pageBoxes, wrap);
     } else {
       ok = await PdfOverlayRight.loadNative(pdfUrl, wrap);
+    }
+    if (ok) {
+      PdfOverlayRight.fitZoom();
+      PdfOverlayRight.highlight(State.entities);
     }
   } finally {
     if (loading) loading.classList.remove('active');
@@ -5354,8 +5366,6 @@ async function _buildRightPdfOverlay() {
   if (ok) {
     _rightPdfOverlayBuiltFor = pdfUrl;
     _rightPdfCurrentPage = 1;
-    PdfOverlayRight.fitZoom();
-    PdfOverlayRight.highlight(State.entities);
     _showRightPdfToolbar(true);
     _updateRightPdfToolbar();
   } else {
