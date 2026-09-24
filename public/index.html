@@ -757,6 +757,17 @@
               <div class="viewer-gutter" id="viewerGutter" aria-hidden="true"></div>
               <div class="text-viewer" id="textViewer"></div>
             </div>
+            <!-- Barre d'outils du document original : pages + zoom (onglet "Original") -->
+            <div id="rightPdfToolbar" class="pdfov-toolbar" style="display:none">
+              <button class="pdfov-tb-btn" onclick="navRightPdfPage(-1)" title="Page précédente"><i data-lucide="chevron-left"></i></button>
+              <span class="pdfov-tb-pages"><span id="rightPdfPageNum">1</span> / <span id="rightPdfPageCount">1</span></span>
+              <button class="pdfov-tb-btn" onclick="navRightPdfPage(1)" title="Page suivante"><i data-lucide="chevron-right"></i></button>
+              <span class="pdfov-tb-sep"></span>
+              <button class="pdfov-tb-btn" onclick="zoomRightPdf(-0.1)" title="Zoom arrière"><i data-lucide="zoom-out"></i></button>
+              <span class="pdfov-tb-zoom" id="rightPdfZoomLabel">100 %</span>
+              <button class="pdfov-tb-btn" onclick="zoomRightPdf(0.1)" title="Zoom avant"><i data-lucide="zoom-in"></i></button>
+              <button class="pdfov-tb-btn pdfov-tb-fit" onclick="fitRightPdf()" title="Ajuster à la largeur">Ajuster</button>
+            </div>
             <!-- Document original avec entités surlignées dessus (onglet "Original", step 3) -->
             <div id="rightPdfWrap" class="pdfov-wrap" style="display:none"></div>
             <div class="viewer-footer">

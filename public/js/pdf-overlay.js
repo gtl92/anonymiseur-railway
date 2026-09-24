@@ -166,6 +166,7 @@ function createPdfOverlay() {
   function clear() {
     _pages = [];
     _lastEntities = null;
+    _zoom = 1;
     if (_container) _container.innerHTML = '';
   }
 
@@ -211,8 +212,9 @@ function createPdfOverlay() {
 
       const words = await nativePageWords(page, viewport);
       if (myBuild !== _buildId) return false;
-      _pages.push({ el: pageEl, words });
+      _pages.push({ el: pageEl, words, naturalWidth: viewport.width });
     }
+    applyZoom();
     return true;
   }
 
@@ -225,7 +227,13 @@ function createPdfOverlay() {
     const myBuild = ++_buildId;
     clear();
     _container = container;
-    if (!pageImages || !pageImages.length) return false;
+    if (!pageImages || !pageImages.length) return Promise.resolve(false);
+
+    // Résolu dès que la 1ère page a ses dimensions naturelles (suffisant pour
+    // fitZoom() — les pages d'un même PDF scanné partagent la même taille) ;
+    // les pages suivantes se complètent en arrière-plan sans bloquer l'appelant.
+    let resolveFirstLoaded;
+    const firstLoaded = new Promise(res => { resolveFirstLoaded = res; });
 
     pageImages.forEach((src, i) => {
       const pageEl = document.createElement('div');
@@ -253,12 +261,54 @@ function createPdfOverlay() {
           });
         }
         _pages[i].words = words;
+        _pages[i].naturalWidth = nw;
+        applyZoom();
+        if (i === 0) resolveFirstLoaded();
         if (_lastEntities) highlight(_lastEntities); // rattrape le surlignage demandé avant chargement
       }, { once: true });
 
-      _pages.push({ el: pageEl, words: [] }); // rempli au onload (dimensions naturelles requises)
+      _pages.push({ el: pageEl, words: [], naturalWidth: null }); // rempli au onload
     });
-    return true;
+    return firstLoaded.then(() => true);
+  }
+
+  // ── Zoom ──────────────────────────────────────────────────────────────────
+  // 1.0 = taille native du rendu (viewport.scale=1.5 pour le PDF, résolution
+  // native de l'image pour l'OCR). Chaque page reçoit une largeur CSS
+  // explicite ; le rapport largeur/hauteur suit via `height: auto` sur le
+  // canvas/l'image.
+  let _zoom = 1;
+
+  function applyZoom() {
+    for (const p of _pages) {
+      if (p.naturalWidth) p.el.style.width = (p.naturalWidth * _zoom) + 'px';
+    }
+  }
+
+  function setZoom(zoom) {
+    _zoom = Math.max(0.25, Math.min(4, zoom));
+    applyZoom();
+    return _zoom;
+  }
+
+  function getZoom() {
+    return _zoom;
+  }
+
+  /** Zoom qui fait tenir la page dans la largeur du conteneur (moins la marge). */
+  function fitZoom() {
+    if (!_container || !_pages.length || !_pages[0].naturalWidth) return _zoom;
+    const available = _container.clientWidth - 24; // padding du conteneur
+    return setZoom(available / _pages[0].naturalWidth);
+  }
+
+  function pageCount() {
+    return _pages.length;
+  }
+
+  function scrollToPage(n) {
+    const p = _pages[n - 1];
+    if (p) p.el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   /**
@@ -292,5 +342,8 @@ function createPdfOverlay() {
     return _pages.length > 0;
   }
 
-  return { loadNative, loadOcr, highlight, clear, isReady };
+  return {
+    loadNative, loadOcr, highlight, clear, isReady,
+    setZoom, getZoom, fitZoom, pageCount, scrollToPage,
+  };
 }

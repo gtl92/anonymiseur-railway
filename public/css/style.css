@@ -1248,6 +1248,39 @@ body.settings-open { overflow: hidden; }
   background: #fff;
 }
 
+/* Barre d'outils du document original : pages + zoom */
+.pdfov-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--bg-3);
+  border-bottom: 1px solid var(--border-default);
+  flex-shrink: 0;
+}
+.pdfov-tb-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: calc(var(--spacing) * 8);
+  height: calc(var(--spacing) * 8);
+  padding: 0 10px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  color: var(--fg-2);
+  cursor: pointer;
+  font-size: var(--text-sm);
+}
+.pdfov-tb-btn:hover { background: var(--bg-4); color: var(--fg-1); }
+.pdfov-tb-fit { width: auto; }
+.pdfov-tb-pages, .pdfov-tb-zoom {
+  font-size: var(--text-sm);
+  color: var(--fg-2);
+  font-family: var(--font-mono);
+  min-width: 52px;
+  text-align: center;
+}
+.pdfov-tb-sep { width: 1px; height: 20px; background: var(--border-default); margin: 0 4px; }
+
 /* Rendu du PDF avec surlignage direct des entités (cf. js/pdf-overlay.js) */
 .pdfov-wrap {
   flex: 1;
@@ -1271,7 +1304,7 @@ body.settings-open { overflow: hidden; }
 .pdfov-page canvas,
 .pdfov-page img {
   display: block;
-  max-width: 100%;
+  width: 100%;   /* suit la largeur explicite posée par JS (zoom) sur .pdfov-page */
   height: auto;
 }
 .pdfov-hl {
